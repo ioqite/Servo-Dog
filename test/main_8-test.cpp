@@ -2,39 +2,25 @@
 // #include <array>
 // #include <ESP32Servo.h>
 // #include <string.h>
-// #include <WiFi.h>
-// #include <esp_wifi.h>
-// #include <esp_now.h>
 
 // #define BUTTON_PIN   9
 
-// #define SERVO_NUM    4
+// #define SERVO_NUM    8
 // #define SERVO_DELAY  5
 // #define SERVO_RETURN_DELAY 50
 // //                                    左前 右前 左后 右后
-// // uint8_t servos_pin[SERVO_NUM]       = {4,  5,  7,  6};
-// uint8_t servos_pin[SERVO_NUM]       = {10,  8,  3,  2};
-// // int16_t servo_correction[SERVO_NUM] = {2, -1,  2,  9};
-// int16_t servo_correction[SERVO_NUM] = {-1, 0,  0,  0};
-// bool servo_local[SERVO_NUM]         = {0,  1,  0,  1};
+// uint8_t servos_pin[SERVO_NUM]       = {4,  5, 10, 11,      14, 12,  8,  3};
+// int16_t servo_correction[SERVO_NUM] = {2, -1,  2,  9,      -1,  0,  0,  0};
+// bool servo_local[SERVO_NUM]         = {0,  1,  0,  1,       0,  1,  0,  1};
 // Servo servos[SERVO_NUM];
 // // bool running_demo = false;
 
-// void servo4_demo1();
-// void servo4_demo2();
+// // void servo4_demo1();
+// // void servo4_demo2();
 // void trot_forward(int n);
 // void walk_forward(int n);
 // void stand();
-// void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len);
 
-// // 接收方mac
-// // esp32s3-lcd-2
-// // const uint8_t mac_target[6] = {0x3c, 0xdc, 0x75, 0x70, 0x0e, 0x94};
-// // esp32s3-cam-h
-// // const uint8_t mac_target[6] = {0x80, 0xb5, 0x4e, 0xc5, 0xcd, 0x94};
-// // esp32-h
-// // const uint8_t mac_target[6] = {0x8c, 0x4f, 0x00, 0xb0, 0xfb, 0x78};
-// const uint8_t mac_target_ak2[6] = {0xb8, 0xf8, 0x62, 0xed, 0x5a, 0x98};
 
 // // #define check_key 0b10100111
 
@@ -64,59 +50,6 @@
 
 // 	POSTURE_STAND = 12,
 // };
-
-// void setup_espnow() {
-// 	// 初始化 ESP-NOW
-// 	WiFi.mode(WIFI_STA);
-// 	// if (esp_wifi_set_channel(11, WIFI_SECOND_CHAN_NONE) != ESP_OK) Serial.println("Failed to set Wi-Fi channel");
-
-// 	if (esp_now_init() != ESP_OK) {
-// 		Serial.println("Error init ESP-NOW");
-// 		while (1) delay(1000000);
-// 	}
-// 	esp_now_register_recv_cb(OnDataRecv);
-
-// 	// esp_now_peer_info_t peerInfo;
-// 	// memcpy(peerInfo.peer_addr, mac_target, ESP_NOW_ETH_ALEN);
-// 	// // peerInfo.channel = 11; // 设置为固定信道
-// 	// peerInfo.ifidx = WIFI_IF_STA;
-// 	// peerInfo.encrypt = false;
-// 	// if (esp_now_add_peer(&peerInfo) != ESP_OK) Serial.println("add peer Fail");
-// 	Serial.println("Init ESP-NOW OK");
-// }
-
-// // 数据接收时的回调函数
-// void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
-// 	// check
-// 	memcpy(&send_key, incomingData, sizeof(send_key));
-// 	if (memcmp(mac, mac_target_ak2, 6) == 0) {
-// 	// if (send_key.check == check_key) {
-// 		// while(send_key_lock) vTaskDelay(1 / portTICK_PERIOD_MS);
-// 		// send_key_lock = 1;
-		
-// 		// send_key_lock = 0;
-		
-// 		String proc_key = send_key.key;
-// 		Serial.printf("[incoming key: %s]\r\n", send_key.key);
-
-// 		if (send_key.key[0] == '$' || send_key.key[1] > '0' || send_key.key[1] <= '9') {
-// 			current_posture = proc_key.substring(1).toInt();
-// 			Serial.printf("current_posture: %d\r\n", current_posture);
-// 		} else {
-// 			Serial.printf("Unknown command: %s\r\n", send_key.key);
-// 			return;
-// 		}
-// 	}
-// 	else {
-// 		// Serial.println(String("[check fail], key: ") + String(send_key.key) + String(", check: ") + String(send_key.check));
-// 		char macStr[32];
-// 		//把接收方mac地址复制为字符串
-// 		snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
-// 				mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-// 		Serial.print("[check fail]: ");
-// 		Serial.println(macStr);
-// 	}
-// }
 
 // void set_angle(int8_t servo_index, int16_t angle) {
 // 	if (servo_local[servo_index]) {
@@ -191,8 +124,9 @@
 // // ==================== 步态代码 ====================
 
 // void stand() {
-//     angles = {0, 0, 0, 0};
-//     set_angle_90_multi(angles);
+//     // angles = {0, 0, 0, 0};
+//     // set_angle_90_multi(angles);
+//     set_angle_90_multi({0, 0, 0, 0,   0, 0, 0, 0});
 // }
 
 // // ============= Trot 步态 =============
@@ -201,14 +135,16 @@
 
 // void trot_forward(int n) {
 // 	for (int i = 0; i < n; i++) {
-// 		// 阶段1: 组A前摆 + 组B后蹬 (4腿同时动)
-// 		angles = { +TROT_SWING, 0, 0, +TROT_SWING };
-// 		set_angle_90_multi(angles);
+// 		// // 阶段1: 组A前摆 + 组B后蹬 (4腿同时动)
+//         set_angle_90_multi({ +TROT_SWING, 0, 0, +TROT_SWING,   0, 0, 0, 0});
+// 		// angles = { +TROT_SWING, 0, 0, +TROT_SWING };
+// 		// set_angle_90_multi(angles);
 // 		delay(TROT_PAUSE);
 
-// 		// 阶段2: 组B前摆 + 组A后蹬 (4腿同时动)
-// 		angles = { 0, +TROT_SWING, +TROT_SWING, 0 };
-// 		set_angle_90_multi(angles);
+// 		// // 阶段2: 组B前摆 + 组A后蹬 (4腿同时动)
+//         set_angle_90_multi({ 0, +TROT_SWING, +TROT_SWING, 0,   0, 0, 0, 0});
+// 		// angles = { 0, +TROT_SWING, +TROT_SWING, 0 };
+// 		// set_angle_90_multi(angles);
 // 		delay(TROT_PAUSE);
 // 	}
 // }
@@ -220,23 +156,27 @@
 // void walk_forward(int n) {
 // 	for (int i = 0; i < n; i++) {
 // 		// 1. 左前(0) 前摆，其余3腿 支撑
-// 		angles = { +WALK_SWING, 0, 0, 0 };
-// 		set_angle_90_multi(angles);
+//         set_angle_90_multi({ +WALK_SWING, 0, 0, 0,   0, 0, 0, 0});
+// 		// angles = { +WALK_SWING, 0, 0, 0 };
+// 		// set_angle_90_multi(angles);
 // 		delay(WALK_PAUSE);
 
 // 		// 2. 右后(3) 前摆，其余3腿 支撑
-// 		angles = { 0, 0, 0, +WALK_SWING };
-// 		set_angle_90_multi(angles);
+//         set_angle_90_multi({ 0, 0, 0, +WALK_SWING,   0, 0, 0, 0});
+// 		// angles = { 0, 0, 0, +WALK_SWING };
+// 		// set_angle_90_multi(angles);
 // 		delay(WALK_PAUSE);
 
 // 		// 3. 右前(1) 前摆，其余3腿 支撑
-// 		angles = { 0, +WALK_SWING, 0, 0 };
-// 		set_angle_90_multi(angles);
+//         set_angle_90_multi({ 0, +WALK_SWING, 0, 0,   0, 0, 0, 0});
+// 		// angles = { 0, +WALK_SWING, 0, 0 };
+// 		// set_angle_90_multi(angles);
 // 		delay(WALK_PAUSE);
 
 // 		// 4. 左后(2) 前摆，其余3腿 支撑
-// 		angles = { 0, 0, +WALK_SWING, 0 };
-// 		set_angle_90_multi(angles);
+//         set_angle_90_multi({ 0, 0, +WALK_SWING, 0,   0, 0, 0, 0});
+// 		// angles = { 0, 0, +WALK_SWING, 0 };
+// 		// set_angle_90_multi(angles);
 // 		delay(WALK_PAUSE);
 // 	}
 // }
@@ -246,25 +186,24 @@
 
 // // 坐下
 // void sit() {
-// 	angles = { -25, -25, 39, 39 };
-// 	// to_angle_90_sync(angles);
-// 	set_angle_90_multi(angles);
+//     set_angle_90_multi({ -25, -25, 39, 39,   0, 0, 0, 0 });
+// 	// angles = { -25, -25, 39, 39 };
+// 	// // to_angle_90_sync(angles);
+// 	// set_angle_90_multi(angles);
 // }
 
 // // 拉伸
 // void stretch() {
-// 	angles = { +60, +60, -10, -10 };
-// 	set_angle_90_multi(angles);
-// // 	angles = { +60, +60, +45, +45,   -30,-30,-30,-30};
-// // 	set_angle_90_multi(angles);
+//     set_angle_90_multi({ +60, +60, -10, -10,   0, 0, 0, 0 });
+// 	// angles = { +60, +60, -10, -10 };
+// 	// set_angle_90_multi(angles);
 // }
 
 // // 躺下
 // void lie_down() {
-// 	angles = { +41,+41, -41, -41 };
-// 	set_angle_90_multi(angles);
-// // 	angles = { +45, +45, -60, -60,   -20,-20,-20,-20};
-// // 	set_angle_90_multi(angles);
+//     set_angle_90_multi({ +41, +41, -41, -41,   0, 0, 0, 0 });
+// 	// angles = { +41,+41, -41, -41 };
+// 	// set_angle_90_multi(angles);
 // }
 
 // // 挥手
@@ -289,13 +228,19 @@
 // void play() {
 // 	srand(time(NULL));
 // 	for (int i = 0; i < 8; i++) {
-// 		angles = {
-// 			rand() % 80 - 40,
-// 			rand() % 80 - 40,
-// 			rand() % 80 - 40,
-// 			rand() % 80 - 40
-// 		};
-// 		set_angle_90_multi(angles);
+//         set_angle_90_multi({
+//             rand() % 80 - 40, rand() % 80 - 40,
+//             rand() % 80 - 40, rand() % 80 - 40,
+//             rand() % 80 - 40, rand() % 80 - 40,
+//             rand() % 80 - 40, rand() % 80 - 40
+//         });
+// 		// angles = {
+// 		// 	rand() % 80 - 40,
+// 		// 	rand() % 80 - 40,
+// 		// 	rand() % 80 - 40,
+// 		// 	rand() % 80 - 40
+// 		// };
+// 		// set_angle_90_multi(angles);
 // 		delay(200);
 // 	}
 // }
@@ -391,7 +336,6 @@
 // 		servos[i].attach(servos_pin[i]);
 // 		set_angle(i, 90);
 // 	}
-// 	setup_espnow();
 // 	// pinMode(BUTTON_PIN, INPUT_PULLUP);
 // 	// attachInterrupt(BUTTON_PIN, handle_button_press, FALLING);
 // }
