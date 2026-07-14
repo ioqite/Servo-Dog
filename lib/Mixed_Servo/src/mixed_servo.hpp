@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <array>
+#include <string.h>
 #include "driver/mcpwm_prelude.h"
 
 namespace m_servo {  // Mixed_Servo 命名空间
@@ -73,6 +75,42 @@ void set_angle_90_multi(std::array<int16_t, TOTAL_SERVO_NUM> targets) {
 		set_angle_90(i, targets[i]);
 	}
 }
+
+// void to_angle(int8_t servo_index, int16_t angle) {
+//     int16_t tmp = servos[servo_index].read();
+//     if (angle > tmp) {
+// 		for (int16_t agl = tmp; agl <= angle; agl++) {
+// 			set_angle(servo_index, agl);
+// 			delay(SERVO_DELAY);
+// 		}
+//     } else {
+// 		for (int16_t agl = tmp; agl >= angle; agl--) {
+// 			set_angle(servo_index, agl);
+// 			delay(SERVO_DELAY);
+// 		}
+//     }
+// }
+
+// void to_angle_90(int8_t servo_index, int16_t angle) {
+//     int16_t tmp = servos[servo_index].read() - 90;  // 修正：转为偏移量
+//     if (angle > tmp) {
+// 		for (int16_t agl = tmp; agl <= angle; agl++) {
+// 			set_angle_90(servo_index, agl);
+// 			delay(SERVO_DELAY);
+// 		}
+//     } else {
+// 		for (int16_t agl = tmp; agl >= angle; agl--) {
+// 			set_angle_90(servo_index, agl);
+// 			delay(SERVO_DELAY);
+// 		}
+//     }
+// }
+
+
+// // 同时将多个舵机平滑地转到目标角度(相对90度偏移)
+// void to_angle_90_sync(std::array<int, TOTAL_SERVO_NUM> targets) {
+//     int16_t cur[TOTAL_SERVO_NUM];
+// 	for (int i = 0; i < TOTAL_SERVO_NUM; i++) cur[i] = servos[i].read() - 90;
 
 // 初始化 MCPWM 舵机
 void __setup_mcpwm() {
