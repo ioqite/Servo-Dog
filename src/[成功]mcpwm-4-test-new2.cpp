@@ -29,7 +29,7 @@ bool _servo_local[TOTAL_SERVO_NUM]         = {0,  1,  0,  1,       0,  1,  0,  1
 
 
 // 原始角度 控制函数 (舵机编号 0-7，角度 0 ~ 180), 自动处理 MCPWM 和 LED 舵机
-void set_angle_raw(int8_t servo_idx, int16_t angle) {
+void set_angle_raw(uint8_t servo_idx, int16_t angle) {
     // 0-3 MCPWM 舵机
     if (servo_idx >= 0 && servo_idx < MCPWM_SERVO_NUM) {
         angle = constrain(angle, 0, 180);
@@ -40,19 +40,19 @@ void set_angle_raw(int8_t servo_idx, int16_t angle) {
     }
     // 4-7 LEDC 舵机
     else if (servo_idx >= MCPWM_SERVO_NUM && servo_idx < TOTAL_SERVO_NUM) {
-    //     Serial.print("set_angle_raw: ledc: ");
-    //     Serial.print(servo_idx);
-    //     Serial.print(", ");
-    //     Serial.println(angle);
-    //     angle = constrain(angle, 0, 180);
-    //     uint32_t pulse_us = map(angle, 0, 180, SERVO_MIN_PULSE_US, SERVO_MAX_PULSE_US);
+        // Serial.print("set_angle_raw: ledc: ");
+        // Serial.print(servo_idx);
+        // Serial.print(", ");
+        // Serial.println(angle);
+        angle = constrain(angle, 0, 180);
+        uint32_t pulse_us = map(angle, 0, 180, SERVO_MIN_PULSE_US, SERVO_MAX_PULSE_US);
         
-    //     ledcWrite(_servos_pin[servo_idx], pulse_us);
+        ledcWrite(_servos_pin[servo_idx], pulse_us);
     }
     else ESP_LOGE("Mixed_Servo", "Invalid servo index: %d", servo_idx);
 }
 // 角度控制函数 (舵机编号 0-7，角度 0 ~ 180)
-void set_angle(int8_t servo_idx, int16_t angle) {
+void set_angle(uint8_t servo_idx, int16_t angle) {
     if (_servo_local[servo_idx]) {
 		set_angle_raw(servo_idx, angle + _servo_correction[servo_idx]);
 	} else {
@@ -60,14 +60,13 @@ void set_angle(int8_t servo_idx, int16_t angle) {
 	}
 }
 // 角度控制函数 (舵机编号 0-7，角度 -90 ~ 90)
-void set_angle_90(int8_t servo_index, int16_t angle) {
+void set_angle_90(uint8_t servo_index, int16_t angle) {
 	if (_servo_local[servo_index]) {
 		set_angle_raw(servo_index, (angle + 90) + _servo_correction[servo_index]);
 	} else {
 		set_angle_raw(servo_index, 180 - (angle + 90) + _servo_correction[servo_index]);
 	}
 }
-
 // 同时将多个舵机 设置到 目标角度(-90 ~ 90)
 void set_angle_90_multi(std::array<int16_t, TOTAL_SERVO_NUM> targets) {
     for (int8_t i = 0; i < TOTAL_SERVO_NUM; i++) {
@@ -176,7 +175,6 @@ void setup() {
     Serial.println("Setup");
     // 初始化舵机
     setup_servos(_servos_pin, _servo_correction);
-    // __setup_mcpwm();
 }
 
 void loop() {
