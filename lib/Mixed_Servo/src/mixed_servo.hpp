@@ -58,7 +58,7 @@ void set_angle(uint8_t servo_idx, int16_t angle) {
     if (_servo_local[servo_idx]) {
 		set_angle_raw(servo_idx, angle + _servo_correction[servo_idx]);
 	} else {
-		set_angle_raw(servo_idx, 180 - angle + _servo_correction[servo_idx]);
+		set_angle_raw(servo_idx, 180 - angle - _servo_correction[servo_idx]);
 	}
 }
 // 角度控制函数 (舵机编号 0-7，角度 -90 ~ 90)
@@ -66,7 +66,7 @@ void set_angle_90(uint8_t servo_index, int16_t angle) {
 	if (_servo_local[servo_index]) {
 		set_angle_raw(servo_index, (angle + 90) + _servo_correction[servo_index]);
 	} else {
-		set_angle_raw(servo_index, 180 - (angle + 90) + _servo_correction[servo_index]);
+		set_angle_raw(servo_index, 180 - (angle + 90) - _servo_correction[servo_index]);
 	}
 }
 // 同时将多个舵机 设置到 目标角度(-90 ~ 90)

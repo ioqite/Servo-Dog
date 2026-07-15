@@ -3,6 +3,8 @@
 #include <array>
 #include <string.h>
 #include "mixed_servo.hpp"
+#include "BLETextLink.hpp"
+#include "user_confug.h"
 
 using namespace m_servo;
 
@@ -10,8 +12,9 @@ using namespace m_servo;
 #define SERVO_DELAY                 7     // 舵机延迟，毫秒
 #define SERVO_RETURN_DELAY          90    // 舵机返回延迟，毫秒
 // 舵机引脚
-uint8_t servos_pin[TOTAL_SERVO_NUM]       = {4,  5, 11, 10,      14, 12,  8,  3};
-int16_t servo_correction[TOTAL_SERVO_NUM] = {3, -3,  2, 10,      -1,  0,  0,  0};
+uint8_t servos_pin[TOTAL_SERVO_NUM]       = { 4,  5, 11, 10,      14, 12,  8,  3};
+// 舵机校准
+int16_t servo_correction[TOTAL_SERVO_NUM] = { 5, -3,  2,  5,       6, -1,  2, -5};
 
 uint8_t current_posture = 0;
 enum POSTURE {
@@ -28,6 +31,9 @@ enum POSTURE {
 	POSTURE_STAND = 12,
 };
 
+// 蓝牙(BLE) 传输器
+BLETextLink bleLink;
+
 // bool running_demo = false;
 // bool is_trot_forward = false;
 // bool is_walk_forward = false;
@@ -37,11 +43,32 @@ void trot_forward(int n);
 void walk_forward(int n);
 void stand();
 
+// BLE 连接 回调
+void BLEonConnect();
+// BLE 断开连接 回调
+void BLEonDisconnect();
+// BLE 接收 回调
+void BLEonReceive(const String& msg);
+
 void setup() {
     pinMode(13, OUTPUT);
     digitalWrite(13, HIGH);
     Serial.begin(115200);
     Serial.println("Setup");
+
+	// 初始化 BLE 连接
+    bleLink.begin(BLE_PEER_MAC, BLE_ROLE, BLE_NAME);
+
+    // 注册回调 (顺序无关, 可在 begin 之后任意时刻注册)
+    bleLink.onConnect(BLEonConnect);
+    bleLink.onDisconnect(BLEonDisconnect);
+    bleLink.onReceive(BLEonReceive);
+
+	Serial.println("======= BLE 信息 =======");
+	Serial.printf("Local BLE MAC: %s\n", bleLink.localAddress().c_str());
+    Serial.printf("Peer  BLE MAC: %s\n", bleLink.peerAddress().c_str());
+    Serial.printf("Role         : %s\n", bleLink.role() == BLETextLink::MASTER ? "MASTER" : "SLAVE");
+	Serial.println("=======================");
 
     // 按下按键 -> 进入深度睡眠
     pinMode(SLEEP_BTN, INPUT_PULLUP);
@@ -188,6 +215,8 @@ void jump_run(int n) {
 
 // 处理姿态
 void proc_posture(void *arg) {
+	if (current_posture == POSTURE_NONE) return;
+
 	switch (current_posture) {
 		case POSTURE_STAND:
 			stand();
@@ -231,9 +260,14 @@ void proc_posture(void *arg) {
 			current_posture = POSTURE_NONE;
 			break;
 	}
+	bleLink.clearBuffer();
 }
 
 void loop() {
+	bleLink.loop();
+	proc_posture(nullptr);
+	vTaskDelay(10 / portTICK_PERIOD_MS);
+	
     // if (is_trot_forward) {
     // 	is_trot_forward = false;
     // 	trot_forward(1);
@@ -261,48 +295,43 @@ void loop() {
 }
 
 
-// void handle_button_press() {
-	// delay(25);
-	// if (digitalRead(BUTTON_PIN) == LOW) running_demo = !running_demo;
-// }
+// ####################### BLE 回调 #######################
 
-// void servo4_demo1() {
-	// for(int16_t angle = 0; angle < 180; angle++) {
-		// for (int8_t i = 0; i < TOTAL_SERVO_NUM; i++) {
-			// set_angle(i, angle);
-		// }
-		// delay(SERVO_DELAY);
-	// }
-	// delay(SERVO_RETURN_DELAY);
-	// for(int16_t angle = 180; angle > 0; angle--) {
-		// for (int8_t i = 0; i < TOTAL_SERVO_NUM; i++) {
-			// set_angle(i, angle);
-		// }
-		// delay(SERVO_DELAY);
-	// }
-	// delay(SERVO_RETURN_DELAY);
-// }
+// BLE 连接 回调
+void BLEonConnect() {
+    Serial.println("[BLE事件] 已连接 键盘 或 其他设备");
+    // 这里可以做"上线后初始化"操作, 如发送握手消息
+    // bleLink.send("Connected from " + bleLink.localAddress());
+}
 
-// void servo4_demo2() {
-	// while (running_demo) {
-		// set_angle_90(1, 0);
-		// set_angle_90(2, 0);
-        // 
-		// to_angle_90 (0, 60);
-		// delay(90);
-		// to_angle_90 (3, 60);
-		// delay(SERVO_DELAY);
-		// 
-		// for(int16_t agl = 0; agl > -60; agl--) {
-			// set_angle_90(1, agl);
-			// set_angle_90(2, agl);
-			// set_angle_90(0, agl + 60);
-			// set_angle_90(3, agl + 60);
-			// delay(SERVO_DELAY);
-		// }
-        //
-		// delay(200);
-	// }
-// }
+// BLE 断开 回调
+void BLEonDisconnect() {
+    Serial.println("[BLE事件] 连接已断开 对方会自动重连");
+}
 
+// BLE 接收 回调
+void BLEonReceive(const String& msg) {
+    Serial.printf("[BLE事件 | 接收] %u bytes: %s\r\n", msg.length(), msg.c_str());
+    // 示例: 收到 "ping" 回 "pong"
+    // if (msg == "ping") bleLink.send("pong");
+
+	// 验证消息格式
+	if (msg == "") return;
+	if (msg[0] != 0x02) return;
+	if (msg[msg.length() - 1] != 0x03) return;
+
+	// 解析消息
+	String proc_key = msg.substring(1, msg.length() - 1);
+	// Serial.printf("[Incoming key: %s]\r\n", proc_key.c_str());
+
+	if (proc_key[0] == '$' && proc_key.substring(1).toInt() > 0) {
+		current_posture = proc_key.substring(1).toInt();
+		Serial.printf("Posture: %d\r\n", current_posture);
+		// proc_posture(nullptr);
+	} else {
+		Serial.printf("Unknown command: %s\r\n", proc_key.c_str());
+		return;
+	}
+	// 处理姿态
+}
 
