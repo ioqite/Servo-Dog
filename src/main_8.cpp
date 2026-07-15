@@ -203,16 +203,6 @@ void play() {
 	}
 }
 
-// 跳跑
-void jump_run(int n) {
-	for (int i = 0; i < n; i++) {
-		sit();
-		delay(400);
-		stand();
-		delay(400);
-	}
-}
-
 // 处理姿态
 void proc_posture(void *arg) {
 	if (current_posture == POSTURE_NONE) return;
@@ -248,10 +238,6 @@ void proc_posture(void *arg) {
 			break;
 		case POSTURE_PLAY:
 			play();
-			current_posture = POSTURE_STAND;
-			break;
-		case POSTURE_JUMP_RUN:
-			jump_run(1);
 			current_posture = POSTURE_STAND;
 			break;
 		case POSTURE_NONE:
