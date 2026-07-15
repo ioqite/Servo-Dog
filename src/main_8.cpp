@@ -94,14 +94,20 @@ void setup() {
 // }
 
 
-// ========================== 步态代码 ==========================
+// ================================ 步态代码 ================================
 
+// 站立
 void stand() {
     set_angle_90_multi({0, 0, 0, 0,   0, 0, 0, 0});
+	to_angle(0, 1000, 0, 90);
+	delay(500);
+	set_angle_90_multi({0, 0, 0, 0,   0, 0, 0, 0});
 }
 
-// ============= Trot 步态 =============
+// ============= Trot 步态（对角步态，前进） =============
 #define TROT_SWING   30
+// #define TROT_STANCE  -15
+// #define TROT_KNEE_UP 25
 #define TROT_PAUSE   270  // 两阶段间短暂停顿(ms), 让身体稳定
 
 void trot_forward(int n) {
@@ -120,6 +126,7 @@ void trot_forward(int n) {
 
 // ============= Walk 步态 =============
 #define WALK_SWING   30
+// #define WALK_KNEE_UP 22
 #define WALK_PAUSE   230  // 两阶段间短暂停顿(ms), 让身体稳定
 
 void walk_forward(int n) {
@@ -152,19 +159,16 @@ void walk_forward(int n) {
 // 坐下
 void sit() {
     set_angle_90_multi({ -25, -25, 39, 39,   0, 0, 0, 0 });
-	//  { -25, -25, 39, 39 };
 }
 
 // 拉伸
 void stretch() {
     set_angle_90_multi({ +60, +60, -10, -10,   0, 0, 0, 0 });
-	//  { +60, +60, -10, -10 };
 }
 
 // 躺下
 void lie_down() {
     set_angle_90_multi({ +41, +41, -41, -41,   0, 0, 0, 0 });
-	//  { +41,+41, -41, -41 };
 }
 
 // 挥手
@@ -193,12 +197,6 @@ void play() {
             (int16_t)(rand() % 80 - 40), (int16_t)(rand() % 80 - 40),
             (int16_t)(rand() % 80 - 40), (int16_t)(rand() % 80 - 40)
         });
-		// {
-		// 	rand() % 80 - 40,
-		// 	rand() % 80 - 40,
-		// 	rand() % 80 - 40,
-		// 	rand() % 80 - 40
-		// };
 		delay(200);
 	}
 }
@@ -320,4 +318,5 @@ void BLEonReceive(const String& msg) {
 	}
 	// 处理姿态
 }
+
 

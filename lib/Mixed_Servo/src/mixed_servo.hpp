@@ -76,41 +76,56 @@ void set_angle_90_multi(std::array<int16_t, TOTAL_SERVO_NUM> targets) {
 	}
 }
 
-// void to_angle(int8_t servo_index, int16_t angle) {
-//     int16_t tmp = servos[servo_index].read();
-//     if (angle > tmp) {
-// 		for (int16_t agl = tmp; agl <= angle; agl++) {
-// 			set_angle(servo_index, agl);
-// 			delay(SERVO_DELAY);
-// 		}
-//     } else {
-// 		for (int16_t agl = tmp; agl >= angle; agl--) {
-// 			set_angle(servo_index, agl);
-// 			delay(SERVO_DELAY);
-// 		}
-//     }
-// }
+// 角度渐变函数 (舵机编号 0-7，角度 0 ~ 180)
+void to_angle(uint8_t servo_idx, float time_ms, float cur, float target) {
+    if (target > cur) {
+        float step = (target - cur) / time_ms;
+        if (step == 0) step = 1;
+		for (float agl = cur; agl <= target; agl += step) {
+			set_angle(servo_idx, (int16_t)agl);
+			delay(1);
+		}
+    } else {
+        float step = (cur - target) / time_ms;
+        if (step == 0) step = 1;
+		for (float agl = cur; agl >= target; agl -= step) {
+			set_angle(servo_idx, (int16_t)agl);
+			delay(1);
+		}
+    }
+}
 
-// void to_angle_90(int8_t servo_index, int16_t angle) {
-//     int16_t tmp = servos[servo_index].read() - 90;  // 修正：转为偏移量
-//     if (angle > tmp) {
-// 		for (int16_t agl = tmp; agl <= angle; agl++) {
-// 			set_angle_90(servo_index, agl);
-// 			delay(SERVO_DELAY);
-// 		}
-//     } else {
-// 		for (int16_t agl = tmp; agl >= angle; agl--) {
-// 			set_angle_90(servo_index, agl);
-// 			delay(SERVO_DELAY);
-// 		}
-//     }
-// }
+void to_angle_90(uint8_t servo_idx, float time_ms, float cur, float target) {
+    if (target > cur) {
+        float step = (target - cur) / time_ms;
+        if (step == 0) step = 1;
+		for (float agl = cur; agl <= target; agl += step) {
+			set_angle_90(servo_idx, (int16_t)agl);
+			delay(1);
+		}
+    } else {
+        float step = (cur - target) / time_ms;
+        if (step == 0) step = 1;
+		for (float agl = cur; agl >= target; agl -= step) {
+			set_angle_90(servo_idx, (int16_t)agl);
+			delay(1);
+		}
+    }
+}
 
-
-// // 同时将多个舵机平滑地转到目标角度(相对90度偏移)
-// void to_angle_90_sync(std::array<int, TOTAL_SERVO_NUM> targets) {
-//     int16_t cur[TOTAL_SERVO_NUM];
-// 	for (int i = 0; i < TOTAL_SERVO_NUM; i++) cur[i] = servos[i].read() - 90;
+// 同时将多个舵机平滑地转到目标角度(相对90度偏移)
+void to_angle_90_sync(std::array<int16_t, TOTAL_SERVO_NUM> cur, std::array<int16_t, TOTAL_SERVO_NUM> target, float time_ms) {
+	bool moving = true;
+	while (moving) {
+		moving = false;
+		for (uint8_t i = 0; i < TOTAL_SERVO_NUM; i++) {
+			if (cur[i] < target[i]) { cur[i]++; moving = true; }
+			else if (cur[i] > target[i]) { cur[i]--; moving = true; }
+			set_angle_90(i, cur[i]);
+		}
+		if (moving) delay(1);
+    }
+}
 
 // 初始化 MCPWM 舵机
 void __setup_mcpwm() {
