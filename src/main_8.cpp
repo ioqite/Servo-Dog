@@ -5,12 +5,15 @@
 #include "mixed_servo.hpp"
 #include "BLETextLink.hpp"
 #include "user_confug.h"
+#include "TinyWS2812.hpp"
 
 using namespace m_servo;
 
 #define SLEEP_BTN                   9   // 睡眠按键 引脚
 #define SERVO_DELAY                 7     // 舵机延迟，毫秒
 #define SERVO_RETURN_DELAY          90    // 舵机返回延迟，毫秒
+#define LEG_OFFSET     30 // n: 大腿舵机偏移
+#define KNEE_OFFSET   -50 // n: 小腿舵机偏移
 // 舵机引脚
 uint8_t servos_pin[TOTAL_SERVO_NUM]       = { 4,  5, 11, 10,      14, 12,  8,  3};
 // 舵机校准
@@ -26,11 +29,13 @@ enum POSTURE {
 	POSTURE_STRETCH,
 	POSTURE_WAVE,
 	POSTURE_PLAY,
-	POSTURE_JUMP_RUN,
+	POSTURE_N_TROT,
+	POSTURE_N_STAND,
 
 	POSTURE_STAND = 12,
 };
 
+WS2812 strip(8, 1);
 // 蓝牙(BLE) 传输器
 BLETextLink bleLink;
 
@@ -49,36 +54,6 @@ void BLEonConnect();
 void BLEonDisconnect();
 // BLE 接收 回调
 void BLEonReceive(const String& msg);
-
-void setup() {
-    pinMode(13, OUTPUT);
-    digitalWrite(13, HIGH);
-    Serial.begin(115200);
-    Serial.println("Setup");
-
-	// 初始化 BLE 连接
-    bleLink.begin(BLE_PEER_MAC, BLE_ROLE, BLE_NAME);
-
-    // 注册回调 (顺序无关, 可在 begin 之后任意时刻注册)
-    bleLink.onConnect(BLEonConnect);
-    bleLink.onDisconnect(BLEonDisconnect);
-    bleLink.onReceive(BLEonReceive);
-
-	Serial.println("======= BLE 信息 =======");
-	Serial.printf("Local BLE MAC: %s\n", bleLink.localAddress().c_str());
-    Serial.printf("Peer  BLE MAC: %s\n", bleLink.peerAddress().c_str());
-    Serial.printf("Role         : %s\n", bleLink.role() == BLETextLink::MASTER ? "MASTER" : "SLAVE");
-	Serial.println("=======================");
-
-    // 按下按键 -> 进入深度睡眠
-    pinMode(SLEEP_BTN, INPUT_PULLUP);
-	attachInterrupt(SLEEP_BTN, [] { esp_deep_sleep_start(); }, FALLING);
-    // pinMode(BUTTON_PIN, INPUT_PULLUP);
-	// attachInterrupt(BUTTON_PIN, handle_button_press, FALLING);
-
-    // 初始化舵机
-    setup_servos(servos_pin, servo_correction);
-}
 
 // void loop() {
 //     for (int16_t i = -30; i < 30; i++) {
@@ -99,9 +74,6 @@ void setup() {
 // 站立
 void stand() {
     set_angle_90_multi({0, 0, 0, 0,   0, 0, 0, 0});
-	to_angle(0, 1000, 0, 90);
-	delay(500);
-	set_angle_90_multi({0, 0, 0, 0,   0, 0, 0, 0});
 }
 
 // ============= Trot 步态（对角步态，前进） =============
@@ -153,6 +125,52 @@ void walk_forward(int n) {
 	}
 }
 
+void n_stand() {
+	set_angle_90_multi({ LEG_OFFSET, LEG_OFFSET, LEG_OFFSET, LEG_OFFSET,   KNEE_OFFSET, KNEE_OFFSET, KNEE_OFFSET, KNEE_OFFSET});
+}
+
+// ============= 新Trot 步态（对角步态，前进） =============
+#define N_TROT_SWING1    43
+#define N_TROT_SWING2     2
+#define N_TROT_KNEE1  -51
+#define N_TROT_KNEE2  -54
+#define N_TROT_PAUSE    270  // 两阶段间短暂停顿(ms), 让身体稳定
+
+void n_trot_forward(int n) {
+	n_stand();
+	delay(N_TROT_PAUSE);
+	for (int i = 0; i < n; i++) {
+		// 逐步迈出
+        set_angle_90_multi({ N_TROT_SWING1, LEG_OFFSET,    LEG_OFFSET,    N_TROT_SWING1,     KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET  });
+		delay(90);
+        set_angle_90_multi({ N_TROT_SWING1, LEG_OFFSET,    LEG_OFFSET,    N_TROT_SWING1,     N_TROT_KNEE1, KNEE_OFFSET,  KNEE_OFFSET,  N_TROT_KNEE1 });
+		delay(90);
+		set_angle_90_multi({ N_TROT_SWING1, N_TROT_SWING2, N_TROT_SWING2, N_TROT_SWING1,     N_TROT_KNEE1, KNEE_OFFSET,  KNEE_OFFSET,  N_TROT_KNEE1 });
+		delay(140);
+		set_angle_90_multi({ N_TROT_SWING1, N_TROT_SWING2, N_TROT_SWING2, N_TROT_SWING1,     N_TROT_KNEE1, N_TROT_KNEE2, N_TROT_KNEE2, N_TROT_KNEE1 });
+		delay(140);
+		// 逐步收回
+		set_angle_90_multi({ LEG_OFFSET,    N_TROT_SWING2, N_TROT_SWING2, LEG_OFFSET,        KNEE_OFFSET,  N_TROT_KNEE2, N_TROT_KNEE2, KNEE_OFFSET  });
+		delay(140);
+		set_angle_90_multi({ LEG_OFFSET,    LEG_OFFSET,    LEG_OFFSET,    LEG_OFFSET,        KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET  });
+		delay(140);
+		
+		// // 逐步迈出
+        // to_angle_90_sync({ N_TROT_SWING1, LEG_OFFSET,    LEG_OFFSET,    N_TROT_SWING1,     KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET  }, 400);
+		// delay(90);
+        // to_angle_90_sync({ N_TROT_SWING1, LEG_OFFSET,    LEG_OFFSET,    N_TROT_SWING1,     N_TROT_KNEE1, KNEE_OFFSET,  KNEE_OFFSET,  N_TROT_KNEE1 }, 400);
+		// delay(200);
+		// to_angle_90_sync({ N_TROT_SWING1, N_TROT_SWING2, N_TROT_SWING2, N_TROT_SWING1,     N_TROT_KNEE1, KNEE_OFFSET,  KNEE_OFFSET,  N_TROT_KNEE1 }, 600);
+		// delay(140);
+		// to_angle_90_sync({ N_TROT_SWING1, N_TROT_SWING2, N_TROT_SWING2, N_TROT_SWING1,     N_TROT_KNEE1, N_TROT_KNEE2, N_TROT_KNEE2, N_TROT_KNEE1 }, 600);
+		// delay(140);
+		// // 逐步收回
+		// to_angle_90_sync({ LEG_OFFSET,    N_TROT_SWING2, N_TROT_SWING2, LEG_OFFSET,        KNEE_OFFSET,  N_TROT_KNEE2, N_TROT_KNEE2, KNEE_OFFSET  }, 600);
+		// delay(140);
+		// to_angle_90_sync({ LEG_OFFSET,    LEG_OFFSET,    LEG_OFFSET,    LEG_OFFSET,        KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET  }, 600);
+		// delay(140);
+	}
+}
 
 // // ============== 自定义姿态 ==============
 
@@ -205,9 +223,15 @@ void play() {
 void proc_posture(void *arg) {
 	if (current_posture == POSTURE_NONE) return;
 
+	strip.setPixel(0, 255, 174, 34);// rgb(255, 174, 34)
+	strip.show();
 	switch (current_posture) {
 		case POSTURE_STAND:
 			stand();
+			current_posture = POSTURE_NONE;
+			break;
+		case POSTURE_N_STAND:
+			n_stand();
 			current_posture = POSTURE_NONE;
 			break;
 		case POSTURE_TROT:
@@ -238,6 +262,10 @@ void proc_posture(void *arg) {
 			play();
 			current_posture = POSTURE_STAND;
 			break;
+		case POSTURE_N_TROT:
+			n_trot_forward(1);
+			current_posture = POSTURE_N_STAND;
+			break;
 		case POSTURE_NONE:
 			break;
 		default:
@@ -245,6 +273,9 @@ void proc_posture(void *arg) {
 			break;
 	}
 	bleLink.clearBuffer();
+	delay(20);
+	strip.setPixel(0, 34, 189, 255);// rgb(34, 189, 255)
+	strip.show();
 }
 
 void loop() {
@@ -286,11 +317,15 @@ void BLEonConnect() {
     Serial.println("[BLE事件] 已连接 键盘 或 其他设备");
     // 这里可以做"上线后初始化"操作, 如发送握手消息
     // bleLink.send("Connected from " + bleLink.localAddress());
+	strip.setPixel(0, 34, 189, 255);// rgb(34, 189, 255)
+	strip.show();
 }
 
 // BLE 断开 回调
 void BLEonDisconnect() {
     Serial.println("[BLE事件] 连接已断开 对方会自动重连");
+	strip.setPixel(0, 34, 255, 97);// rgb(34, 255, 97)
+	strip.show();
 }
 
 // BLE 接收 回调
@@ -316,7 +351,39 @@ void BLEonReceive(const String& msg) {
 		Serial.printf("Unknown command: %s\r\n", proc_key.c_str());
 		return;
 	}
-	// 处理姿态
 }
 
+void setup() {
+    pinMode(13, OUTPUT);
+    digitalWrite(13, HIGH);
+    Serial.begin(115200);
+    Serial.println("Setup");
+	strip.begin();
+
+	// 初始化 BLE 连接
+    bleLink.begin(BLE_PEER_MAC, BLE_ROLE, BLE_NAME);
+
+    // 注册回调 (顺序无关, 可在 begin 之后任意时刻注册)
+    bleLink.onConnect(BLEonConnect);
+    bleLink.onDisconnect(BLEonDisconnect);
+    bleLink.onReceive(BLEonReceive);
+
+	Serial.println("======= BLE 信息 =======");
+	Serial.printf("Local BLE MAC: %s\n", bleLink.localAddress().c_str());
+    Serial.printf("Peer  BLE MAC: %s\n", bleLink.peerAddress().c_str());
+    Serial.printf("Role         : %s\n", bleLink.role() == BLETextLink::MASTER ? "MASTER" : "SLAVE");
+	Serial.println("=======================");
+
+    // 按下按键 -> 进入深度睡眠
+    pinMode(SLEEP_BTN, INPUT_PULLUP);
+	attachInterrupt(SLEEP_BTN, [] { esp_deep_sleep_start(); }, FALLING);
+    // pinMode(BUTTON_PIN, INPUT_PULLUP);
+	// attachInterrupt(BUTTON_PIN, handle_button_press, FALLING);
+
+    // 初始化舵机
+    setup_servos(servos_pin, servo_correction);
+	n_stand();
+	strip.setPixel(0, 34, 255, 97);// rgb(34, 255, 97)
+	strip.show();
+}
 

@@ -15,6 +15,8 @@ uint8_t _servos_pin[TOTAL_SERVO_NUM]       = {4,  5, 11, 10,      14, 12,  8,  3
 int16_t _servo_correction[TOTAL_SERVO_NUM] = {3, -3,  2, 10,      -1,  0,  0,  0};
 bool _servo_local[TOTAL_SERVO_NUM]         = {0,  1,  0,  1,       0,  1,  0,  1};
 
+std::array<int16_t, TOTAL_SERVO_NUM> cur = {0,  0,  0,  0,       0,  0,  0,  0};
+
 // ============= MCPWM 舵机 ==============
 #define MCPWM_SERVO_NUM            4        // MCPWM 舵机数
 #define MCPWM_TIMER_RESOLUTION_HZ  1000000  // 分辨率: 1MHz, 1微秒 / tick
@@ -60,6 +62,7 @@ void set_angle(uint8_t servo_idx, int16_t angle) {
 	} else {
 		set_angle_raw(servo_idx, 180 - angle - _servo_correction[servo_idx]);
 	}
+    cur[servo_idx] = angle - 90;
 }
 // 角度控制函数 (舵机编号 0-7，角度 -90 ~ 90)
 void set_angle_90(uint8_t servo_index, int16_t angle) {
@@ -68,6 +71,7 @@ void set_angle_90(uint8_t servo_index, int16_t angle) {
 	} else {
 		set_angle_raw(servo_index, 180 - (angle + 90) - _servo_correction[servo_index]);
 	}
+    cur[servo_index] = angle;
 }
 // 同时将多个舵机 设置到 目标角度(-90 ~ 90)
 void set_angle_90_multi(std::array<int16_t, TOTAL_SERVO_NUM> targets) {
@@ -114,7 +118,7 @@ void to_angle_90(uint8_t servo_idx, float time_ms, float cur, float target) {
 }
 
 // 同时将多个舵机平滑地转到目标角度(相对90度偏移)
-void to_angle_90_sync(std::array<int16_t, TOTAL_SERVO_NUM> cur, std::array<int16_t, TOTAL_SERVO_NUM> target, float time_ms) {
+void to_angle_90_sync(std::array<int16_t, TOTAL_SERVO_NUM> target, float time_ms) {
 	bool moving = true;
 	while (moving) {
 		moving = false;
