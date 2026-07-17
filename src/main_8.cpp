@@ -5,7 +5,8 @@
 #include "mixed_servo.hpp"
 #include "BLETextLink.hpp"
 #include "user_confug.h"
-#include "TinyWS2812.hpp"
+// #include "TinyWS2812.hpp"
+#include "Adafruit_NeoPixel.h"
 
 using namespace m_servo;
 
@@ -15,7 +16,7 @@ using namespace m_servo;
 #define LEG_OFFSET     30 // n: 大腿舵机偏移
 #define KNEE_OFFSET   -50 // n: 小腿舵机偏移
 // 舵机引脚
-uint8_t servos_pin[TOTAL_SERVO_NUM]       = { 4,  5, 11, 10,      14, 12,  8,  3};
+uint8_t servos_pin[TOTAL_SERVO_NUM]       = { 4,  5, 11, 10,      14, 12,  0,  3};
 // 舵机校准
 int16_t servo_correction[TOTAL_SERVO_NUM] = { 5, -3,  2,  5,       6, -1,  2, -5};
 
@@ -35,7 +36,9 @@ enum POSTURE {
 	POSTURE_STAND = 12,
 };
 
-WS2812 strip(8, 1);
+// WS2812 pixels(8, 1);
+Adafruit_NeoPixel pixels(1, 8, NEO_GRB + NEO_KHZ800);
+
 // 蓝牙(BLE) 传输器
 BLETextLink bleLink;
 
@@ -223,8 +226,8 @@ void play() {
 void proc_posture(void *arg) {
 	if (current_posture == POSTURE_NONE) return;
 
-	strip.setPixel(0, 255, 174, 34);// rgb(255, 174, 34)
-	strip.show();
+	pixels.setPixelColor(0, 255, 174, 34);// rgb(255, 174, 34)
+	pixels.show();
 	switch (current_posture) {
 		case POSTURE_STAND:
 			stand();
@@ -274,8 +277,8 @@ void proc_posture(void *arg) {
 	}
 	bleLink.clearBuffer();
 	delay(20);
-	strip.setPixel(0, 34, 189, 255);// rgb(34, 189, 255)
-	strip.show();
+	pixels.setPixelColor(0, 34, 189, 255);// rgb(34, 189, 255)
+	pixels.show();
 }
 
 void loop() {
@@ -317,15 +320,15 @@ void BLEonConnect() {
     Serial.println("[BLE事件] 已连接 键盘 或 其他设备");
     // 这里可以做"上线后初始化"操作, 如发送握手消息
     // bleLink.send("Connected from " + bleLink.localAddress());
-	strip.setPixel(0, 34, 189, 255);// rgb(34, 189, 255)
-	strip.show();
+	pixels.setPixelColor(0, 34, 189, 255);// rgb(34, 189, 255)
+	pixels.show();
 }
 
 // BLE 断开 回调
 void BLEonDisconnect() {
     Serial.println("[BLE事件] 连接已断开 对方会自动重连");
-	strip.setPixel(0, 34, 255, 97);// rgb(34, 255, 97)
-	strip.show();
+	pixels.setPixelColor(0, 34, 255, 97);// rgb(34, 255, 97)
+	pixels.show();
 }
 
 // BLE 接收 回调
@@ -358,7 +361,8 @@ void setup() {
     digitalWrite(13, HIGH);
     Serial.begin(115200);
     Serial.println("Setup");
-	strip.begin();
+	pixels.begin();
+	pixels.setBrightness(35);
 
 	// 初始化 BLE 连接
     bleLink.begin(BLE_PEER_MAC, BLE_ROLE, BLE_NAME);
@@ -376,14 +380,14 @@ void setup() {
 
     // 按下按键 -> 进入深度睡眠
     pinMode(SLEEP_BTN, INPUT_PULLUP);
-	attachInterrupt(SLEEP_BTN, [] { esp_deep_sleep_start(); }, FALLING);
+	attachInterrupt(SLEEP_BTN, [] { pixels.setPixelColor(0, 39, 13, 97); pixels.show(); esp_deep_sleep_start(); }, FALLING);
     // pinMode(BUTTON_PIN, INPUT_PULLUP);
 	// attachInterrupt(BUTTON_PIN, handle_button_press, FALLING);
 
     // 初始化舵机
     setup_servos(servos_pin, servo_correction);
 	n_stand();
-	strip.setPixel(0, 34, 255, 97);// rgb(34, 255, 97)
-	strip.show();
+	pixels.setPixelColor(0, 34, 255, 97);// rgb(34, 255, 97)
+	pixels.show();
 }
 
