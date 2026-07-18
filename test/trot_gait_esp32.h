@@ -227,7 +227,7 @@ inline void trotSetPowerCallback(TrotController::PowerCallback cb)   { trot.setP
 inline void trotSetReleaseCallback(TrotController::ReleaseCallback cb) { trot.setReleaseCallback(cb); }
 
 /* 启动 FreeRTOS 任务自动调用 mainloop (5ms 周期, 默认 core=0, 优先级=4) */
-void trotStartTask(uint8_t core = 0, uint8_t priority = 4, uint32_t stackSize = 4096);
+void trotStartTask(uint8_t priority, uint32_t stackSize);
 
 /* 停止 mainloop 任务 */
 void trotStopTask();

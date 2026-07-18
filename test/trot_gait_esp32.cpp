@@ -535,7 +535,7 @@ static void trot_task(void* /*arg*/) {
     vTaskDelete(nullptr);
 }
 
-void trotStartTask(uint8_t core, uint8_t priority, uint32_t stackSize) {
+void trotStartTask(uint8_t priority, uint32_t stackSize) {
     if (s_trot_task_handle) return;     // 已启动
     s_trot_task_run = true;
     xTaskCreate(

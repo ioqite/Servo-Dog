@@ -99,8 +99,8 @@ void setup() {
     // trot.cfg.apply_mechan_offset = false;  // true=启用原工程小腿非线性标定曲线
     // trot.cfg.init_1h_offset = 0;           // 每条腿单独微调零位 (用户库 servo_correction[] 已修正, 通常保持 0)
 
-    // 启动 5ms 周期 mainloop 任务 (core=1, 优先级=2)
-    trotStartTask(0, 4, 4096);
+    // 启动 5ms 周期 mainloop 任务 (core=0, 优先级=4)
+    trotStartTask(4, 4096);
 
     Serial.println("Trot gait started. Commands: f/b/l/r/s/q");
     Serial.println("  f = forward, b = backward, l = turn left, r = turn right");
