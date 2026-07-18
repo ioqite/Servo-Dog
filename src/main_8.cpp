@@ -18,7 +18,7 @@ using namespace m_servo;
 // 舵机引脚
 uint8_t servos_pin[TOTAL_SERVO_NUM]       = { 4,  5, 11, 10,      14, 12,  0,  3};
 // 舵机校准
-int16_t servo_correction[TOTAL_SERVO_NUM] = { 5, -3,  2,  5,       6, -1,  2, -5};
+int16_t servo_correction[TOTAL_SERVO_NUM] = { 5, -3,  2,  3,       6, -1,  2, -7};
 
 uint8_t current_posture = 0;
 enum POSTURE {
@@ -179,12 +179,13 @@ void n_trot_forward(int n) {
 
 // 坐下
 void sit() {
-    set_angle_90_multi({ -25, -25, 39, 39,   0, 0, 0, 0 });
+    set_angle_90_multi({ -23, -23, 28, 28,   -9, -9, 29, 29 });
+	// 旧步态：{ -25, -25, 39, 39,   0, 0, 0, 0 }
 }
 
 // 拉伸
 void stretch() {
-    set_angle_90_multi({ +60, +60, -10, -10,   0, 0, 0, 0 });
+    set_angle_90_multi({ +41, +41, -10, -10,   30, 30, -12, -12 });
 }
 
 // 躺下
@@ -198,14 +199,17 @@ void wave() {
 	delay(460);
 	for (int i = 0; i < 3; i++) {
 		set_angle_90(1, 90);
+		set_angle_90(5, 40);
 		//  {0, 90, 0, 0, 0, 0, 20, 0};
 		delay(200);
 		set_angle_90(1, 60);
+		set_angle_90(5, 10);
 		//  {0, 60, 0, 0, 0, 0, -15, 0};
 		delay(200);
 	}
 	// 回到坐姿
 	set_angle_90(1, -25);
+	set_angle_90(5, 0);
 }
 
 // 玩耍
@@ -225,6 +229,8 @@ void play() {
 // 处理姿态
 void proc_posture(void *arg) {
 	if (current_posture == POSTURE_NONE) return;
+
+	uint32_t tmpColor = pixels.getPixelColor(0);
 
 	pixels.setPixelColor(0, 255, 174, 34);// rgb(255, 174, 34)
 	pixels.show();
@@ -277,7 +283,7 @@ void proc_posture(void *arg) {
 	}
 	bleLink.clearBuffer();
 	delay(20);
-	pixels.setPixelColor(0, 34, 189, 255);// rgb(34, 189, 255)
+	pixels.setPixelColor(0, tmpColor);
 	pixels.show();
 }
 
@@ -320,14 +326,14 @@ void BLEonConnect() {
     Serial.println("[BLE事件] 已连接 键盘 或 其他设备");
     // 这里可以做"上线后初始化"操作, 如发送握手消息
     // bleLink.send("Connected from " + bleLink.localAddress());
-	pixels.setPixelColor(0, 34, 189, 255);// rgb(34, 189, 255)
+	pixels.setPixelColor(0, 34, 111, 255);// rgb(34, 111, 255)
 	pixels.show();
 }
 
 // BLE 断开 回调
 void BLEonDisconnect() {
     Serial.println("[BLE事件] 连接已断开 对方会自动重连");
-	pixels.setPixelColor(0, 34, 255, 97);// rgb(34, 255, 97)
+	pixels.setPixelColor(0, 89, 255, 34);// rgb(89, 255, 34)
 	pixels.show();
 }
 
@@ -363,6 +369,8 @@ void setup() {
     Serial.println("Setup");
 	pixels.begin();
 	pixels.setBrightness(35);
+	pixels.setPixelColor(0, 89, 255, 34);// rgb(89, 255, 34)
+	pixels.show();
 
 	// 初始化 BLE 连接
     bleLink.begin(BLE_PEER_MAC, BLE_ROLE, BLE_NAME);
@@ -387,7 +395,5 @@ void setup() {
     // 初始化舵机
     setup_servos(servos_pin, servo_correction);
 	n_stand();
-	pixels.setPixelColor(0, 34, 255, 97);// rgb(34, 255, 97)
-	pixels.show();
 }
 
