@@ -27,13 +27,12 @@
  *      trotStartTask()                启动 FreeRTOS 任务自动调用 mainloop (5ms 周期)
  * =============================================================================
  */
-#ifndef TROT_GAIT_ESP32_H
-#define TROT_GAIT_ESP32_H
+#pragma once
 
 #include <cstdint>
 #include <cmath>
 
-/* 用户舵机库, 必须在 include 本文件之前能够被找到 */
+/* 用户舵机库 */
 #include "mixed_servo.hpp"
 
 namespace padynamics {
@@ -227,8 +226,8 @@ inline void trotRelease()                  { trot.release(); }
 inline void trotSetPowerCallback(TrotController::PowerCallback cb)   { trot.setPowerCallback(cb); }
 inline void trotSetReleaseCallback(TrotController::ReleaseCallback cb) { trot.setReleaseCallback(cb); }
 
-/* 启动 FreeRTOS 任务自动调用 mainloop (5ms 周期, 默认 core=1, 优先级=2) */
-void trotStartTask(uint8_t core = 1, uint8_t priority = 2, uint32_t stackSize = 4096);
+/* 启动 FreeRTOS 任务自动调用 mainloop (5ms 周期, 默认 core=0, 优先级=4) */
+void trotStartTask(uint8_t core = 0, uint8_t priority = 4, uint32_t stackSize = 4096);
 
 /* 停止 mainloop 任务 */
 void trotStopTask();
@@ -260,4 +259,4 @@ void trotStopTask();
  * ========================================================================== */
 bool readIMU(padynamics::IMUData& out);
 
-#endif // TROT_GAIT_ESP32_H
+

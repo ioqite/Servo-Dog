@@ -67,7 +67,7 @@ void onReleaseServos() {
 // 这里用 GPIO13 做示意 (用户原 setup 里已置 HIGH, 这里仅演示接口)。
 void onServoPower(bool on) {
     // digitalWrite(13, on ? HIGH : LOW);
-    Serial.println("Enable Servo Power");
+    // Serial.println("Enable Servo Power");
 }
 
 void setup() {
@@ -100,7 +100,7 @@ void setup() {
     // trot.cfg.init_1h_offset = 0;           // 每条腿单独微调零位 (用户库 servo_correction[] 已修正, 通常保持 0)
 
     // 启动 5ms 周期 mainloop 任务 (core=1, 优先级=2)
-    trotStartTask();
+    trotStartTask(0, 4, 4096);
 
     Serial.println("Trot gait started. Commands: f/b/l/r/s/q");
     Serial.println("  f = forward, b = backward, l = turn left, r = turn right");
@@ -157,5 +157,5 @@ void loop() {
                           trot.getRH(),  trot.getIKError());
         }
     }
-    vTaskDelay(10 / portTICK_PERIOD_MS);
+    vTaskDelay(20 / portTICK_PERIOD_MS);
 }

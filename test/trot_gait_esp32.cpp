@@ -12,6 +12,7 @@
  *        + mixed_servo.hpp 一起放入 sketch 的 src/ 目录即可。
  * =============================================================================
  */
+
 #include "trot_gait_esp32.h"
 
 #include <Arduino.h>
@@ -537,14 +538,13 @@ static void trot_task(void* /*arg*/) {
 void trotStartTask(uint8_t core, uint8_t priority, uint32_t stackSize) {
     if (s_trot_task_handle) return;     // 已启动
     s_trot_task_run = true;
-    xTaskCreatePinnedToCore(
+    xTaskCreate(
         trot_task,
         "trot",
         stackSize,
         nullptr,
         priority,
-        &s_trot_task_handle,
-        core
+        &s_trot_task_handle
     );
 }
 
