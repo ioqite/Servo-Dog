@@ -228,12 +228,13 @@ void TrotController::gesture(double PIT, double ROL, double X) {
 }
 
 void TrotController::stable(bool key) {
-    state_.key_stab = key;
-    if (key) {
+    if (key && !state_.key_stab) {
+        state_.speed_init = cfg.speed;          // 开启自稳时保存当前速度
         cfg.speed = state_.speed_init + 0.01;   // 补偿开陀螺仪造成的速度突变
-    } else {
-        cfg.speed = state_.speed_init;
+    } else if (!key && state_.key_stab) {
+        cfg.speed = state_.speed_init;          // 关闭自稳时恢复原速度
     }
+    state_.key_stab = key;
 }
 
 void TrotController::gait(int mode) { state_.gait_mode = mode; }
@@ -262,9 +263,18 @@ void TrotController::mainloop() {
         return;   // 本文件未实现 Walk 等其它步态
     }
     state_.act_tran_mov_kp = cfg.tran_mov_kp;
+
+    // 5. 速度调节器 (P) — 必须先于相位推进，让 spd 先收敛到目标值
+    if (state_.spd > state_.spd_goal) {
+        state_.spd -= std::fabs(state_.spd - state_.spd_goal) * cfg.Kp_V;
+    } else if (state_.spd < state_.spd_goal) {
+        state_.spd += std::fabs(state_.spd - state_.spd_goal) * cfg.Kp_V;
+    }
+
+    // 3. 步态相位推进 — 使用 spd_goal 判断，避免 spd 瞬态值干扰
     if (state_.t >= 1.0) {
         state_.t = 0;
-    } else if (state_.L == 0 && state_.R == 0) {
+    } else if (state_.spd_goal == 0 && state_.L == 0 && state_.R == 0) {
         state_.t = 0;
     } else {
         state_.t = state_.t + cfg.speed;
@@ -273,10 +283,9 @@ void TrotController::mainloop() {
     // 4. Trot 步态足端位置生成
     //    原代码: P_ = PA_GAIT.trot(t, spd*10, h, L, L, R, R)
     //    注意 r1,r2 用 L; r3,r4 用 R (即腿1,2 与 3,4 方向独立)
-    GaitResult P = trot_gait(state_.t, state_.spd * 10, cfg.h,
+    //    增大足端位移系数使动作更明显 (原工程 spd 是 0~1 范围)
+    GaitResult P = trot_gait(state_.t, state_.spd_goal * 30, cfg.h,
                              state_.L, state_.R, state_.L, state_.R);
-
-    // 5. 速度调节器 (P)
     if (state_.spd > state_.spd_goal) {
         state_.spd -= std::fabs(state_.spd - state_.spd_goal) * cfg.Kp_V;
     } else if (state_.spd < state_.spd_goal) {

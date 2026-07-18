@@ -64,8 +64,8 @@ struct Config {
     double w  = 108;    // 机身宽
 
     /* —— 步态参数 —— */
-    double speed = 0.05;   // 步态相位推进速度 (每次 mainloop 步进值)
-    double h     = 30;     // Trot 抬腿高度 (z_target)
+    double speed = 0.12;   // 步态相位推进速度 (每次 mainloop 步进值)
+    double h     = 45;     // Trot 抬腿高度 (z_target)
 
     /* —— 调节器增益 —— */
     double Kp_H        = 0.06;   // 高度 P
@@ -79,9 +79,9 @@ struct Config {
     int ma_case = 0;
 
     /* —— Trot 重心补偿系数 —— */
-    double trot_cg_f = 4;   // 前进时
-    double trot_cg_b = 4;   // 后退时
-    double trot_cg_t = 2;   // 原地转时
+    double trot_cg_f = 0.5;   // 前进时
+    double trot_cg_b = 0.5;   // 后退时
+    double trot_cg_t = 0.3;   // 原地转时
 
     int in_y = 17;          // 自稳 X 偏置基准
 
