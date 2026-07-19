@@ -115,18 +115,22 @@ void loop() {
         cmd.toLowerCase();
         if (cmd == "f") {
             trotServoInit(0);
+            trotStartTask(4, 4096);         // 确保任务在运行 (q 后重启)
             trotMove(2.0, 1, 1);          // 前进
             Serial.println("-> forward");
         } else if (cmd == "b") {
             trotServoInit(0);
+            trotStartTask(4, 4096);
             trotMove(2.0, -1, -1);        // 后退
             Serial.println("-> backward");
         } else if (cmd == "l") {
             trotServoInit(0);
+            trotStartTask(4, 4096);
             trotMove(2.5, -1, 1);         // 原地左转
             Serial.println("-> turn left");
         } else if (cmd == "r") {
             trotServoInit(0);
+            trotStartTask(4, 4096);
             trotMove(2.5, 1, -1);         // 原地右转
             Serial.println("-> turn right");
         } else if (cmd == "s") {

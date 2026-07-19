@@ -284,13 +284,8 @@ void TrotController::mainloop() {
     //    原代码: P_ = PA_GAIT.trot(t, spd*10, h, L, L, R, R)
     //    注意 r1,r2 用 L; r3,r4 用 R (即腿1,2 与 3,4 方向独立)
     //    增大足端位移系数使动作更明显 (原工程 spd 是 0~1 范围)
-    GaitResult P = trot_gait(state_.t, state_.spd_goal * 30, cfg.h,
+    GaitResult P = trot_gait(state_.t, state_.spd_goal * 25, cfg.h,
                              state_.L, state_.R, state_.L, state_.R);
-    if (state_.spd > state_.spd_goal) {
-        state_.spd -= std::fabs(state_.spd - state_.spd_goal) * cfg.Kp_V;
-    } else if (state_.spd < state_.spd_goal) {
-        state_.spd += std::fabs(state_.spd - state_.spd_goal) * cfg.Kp_V;
-    }
 
     // 6. 高度调节器 (P)
     if (state_.R_H > state_.H_goal) {
@@ -378,6 +373,19 @@ void TrotController::mainloop() {
         return;
     }
     state_.IK_ERROR = 0;
+
+    // 调试: 打印 IK 输出和足端坐标 (每 20 个周期打印一次, 避免刷屏)
+    {
+        static int dbg_cnt = 0;
+        if (++dbg_cnt >= 20) {
+            dbg_cnt = 0;
+            Serial.printf("[DBG] t=%.3f fx=[%.1f,%.1f,%.1f,%.1f] fy=[%.1f,%.1f,%.1f,%.1f]\n",
+                          state_.t, fx[0], fx[1], fx[2], fx[3], fy[0], fy[1], fy[2], fy[3]);
+            Serial.printf("[DBG] ham=[%.1f,%.1f,%.1f,%.1f] shank=[%.1f,%.1f,%.1f,%.1f]\n",
+                          A.ham1, A.ham2, A.ham3, A.ham4,
+                          A.shank1, A.shank2, A.shank3, A.shank4);
+        }
+    }
 
     // 14. 输出到舵机
     servo_output(A.ham1, A.ham2, A.ham3, A.ham4,
@@ -488,18 +496,33 @@ void TrotController::servo_output(double ham1, double ham2, double ham3, double 
 
     if (c.ma_case == 0 && state_.init_case == 0) {
         // 用户舵机顺序: [hip1, hip2, hip3, hip4, knee1, knee2, knee3, knee4]
-        // 4 条腿统一公式 (用户库自动镜像)
+        // 4 条腿统一公式 (用户库 _servo_local 自动镜像, _servo_correction 校准)
+        //
+        // 关键: IK 的"静止中位" ham/shank 不是 90°, 而是由腿长 l1/l2 和站立高度 R_H 决定。
+        // 静止时足端在 (0, -R_H), 解算:
+        //   r = R_H, fai = acos((l1² + r² - l2²) / (2*l1*r))
+        //   ham_rest  = 90° - fai        (x=0 分支)
+        //   shank_rest = 180° - acos((r² - l1² - l2²) / (-2*l1*l2))
+        // 用 ham - ham_rest 代替 ham - 90, 使静止时舵机回到中位 (off=0)。
+        double Hc = state_.R_H;
+        double r_rest = Hc;
+        double fai_rest = std::acos((c.l1*c.l1 + r_rest*r_rest - c.l2*c.l2) / (2.0*c.l1*r_rest));
+        double ham_rest  = 90.0 - rad2deg(fai_rest);
+        double shank_arg = (r_rest*r_rest - c.l1*c.l1 - c.l2*c.l2) / (-2.0*c.l1*c.l2);
+        shank_arg = std::max(-1.0, std::min(1.0, shank_arg));
+        double shank_rest = 180.0 - rad2deg(std::acos(shank_arg));
+
         double hip_off[4] = {
-            ham1 - 90.0 + c.init_1h_offset,
-            ham2 - 90.0 + c.init_2h_offset,
-            ham3 - 90.0 + c.init_3h_offset,
-            ham4 - 90.0 + c.init_4h_offset,
+            ham1 - ham_rest + c.init_1h_offset,
+            ham2 - ham_rest + c.init_2h_offset,
+            ham3 - ham_rest + c.init_3h_offset,
+            ham4 - ham_rest + c.init_4h_offset,
         };
         double knee_off[4] = {
-            knee(shank1) - 90.0 + c.init_1s_offset,
-            knee(shank2) - 90.0 + c.init_2s_offset,
-            knee(shank3) - 90.0 + c.init_3s_offset,
-            knee(shank4) - 90.0 + c.init_4s_offset,
+            knee(shank1) - shank_rest + c.init_1s_offset,
+            knee(shank2) - shank_rest + c.init_2s_offset,
+            knee(shank3) - shank_rest + c.init_3s_offset,
+            knee(shank4) - shank_rest + c.init_4s_offset,
         };
         for (int i = 0; i < 4; i++) {
             off[i]     = (int16_t)std::lround(hip_off[i]);
@@ -522,8 +545,13 @@ void TrotController::servo_output(double ham1, double ham2, double ham3, double 
     }
 
     // 调用用户舵机库批量下发: {hip1, hip2, hip3, hip4, knee1, knee2, knee3, knee4}
-    m_servo::set_angle_90_multi({ off[0], off[1], off[2], off[3],
-                                  off[4], off[5], off[6], off[7] });
+    m_servo::set_angle_90_multi({ off[0], off[1], off[3], off[2],
+                                  off[4], off[5], off[7], off[6] });
+
+    // // 直接下发 0~180° 绝对角度到各舵机通道
+    // for (int i = 0; i < 8; i++) {
+    //     m_servo::set_angle(i, off[i]);
+    // }
 }
 
 /* ============================================================================
