@@ -7,8 +7,10 @@
 #include "user_confug.h"
 // #include "TinyWS2812.hpp"
 #include "Adafruit_NeoPixel.h"
+#include "padog_gait.h"
 
 using namespace m_servo;
+using namespace padynamics;
 
 #define SLEEP_BTN                   9   // 睡眠按键 引脚
 #define SERVO_DELAY                 7     // 舵机延迟，毫秒
@@ -30,8 +32,8 @@ enum POSTURE {
 	POSTURE_STRETCH,
 	POSTURE_WAVE,
 	POSTURE_PLAY,
-	POSTURE_N_TROT,
-	POSTURE_N_STAND,
+	POSTURE_N_TROT_FORWARD,
+	POSTURE_HALF_STAND,
 
 	POSTURE_STAND = 12,
 };
@@ -50,6 +52,7 @@ BLETextLink bleLink;
 void trot_forward(int n);
 void walk_forward(int n);
 void stand();
+bool readIMU(padynamics::IMUData& out);
 
 // BLE 连接 回调
 void BLEonConnect();
@@ -128,51 +131,21 @@ void walk_forward(int n) {
 	}
 }
 
-void n_stand() {
+void half_stand() {
 	set_angle_90_multi({ LEG_OFFSET, LEG_OFFSET, LEG_OFFSET, LEG_OFFSET,   KNEE_OFFSET, KNEE_OFFSET, KNEE_OFFSET, KNEE_OFFSET});
 }
 
-// ============= 新Trot 步态（对角步态，前进） =============
-#define N_TROT_SWING1    43
-#define N_TROT_SWING2     2
-#define N_TROT_KNEE1  -51
-#define N_TROT_KNEE2  -54
-#define N_TROT_PAUSE    270  // 两阶段间短暂停顿(ms), 让身体稳定
-
-void n_trot_forward(int n) {
-	n_stand();
-	delay(N_TROT_PAUSE);
-	for (int i = 0; i < n; i++) {
-		// 逐步迈出
-        set_angle_90_multi({ N_TROT_SWING1, LEG_OFFSET,    LEG_OFFSET,    N_TROT_SWING1,     KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET  });
-		delay(90);
-        set_angle_90_multi({ N_TROT_SWING1, LEG_OFFSET,    LEG_OFFSET,    N_TROT_SWING1,     N_TROT_KNEE1, KNEE_OFFSET,  KNEE_OFFSET,  N_TROT_KNEE1 });
-		delay(90);
-		set_angle_90_multi({ N_TROT_SWING1, N_TROT_SWING2, N_TROT_SWING2, N_TROT_SWING1,     N_TROT_KNEE1, KNEE_OFFSET,  KNEE_OFFSET,  N_TROT_KNEE1 });
-		delay(140);
-		set_angle_90_multi({ N_TROT_SWING1, N_TROT_SWING2, N_TROT_SWING2, N_TROT_SWING1,     N_TROT_KNEE1, N_TROT_KNEE2, N_TROT_KNEE2, N_TROT_KNEE1 });
-		delay(140);
-		// 逐步收回
-		set_angle_90_multi({ LEG_OFFSET,    N_TROT_SWING2, N_TROT_SWING2, LEG_OFFSET,        KNEE_OFFSET,  N_TROT_KNEE2, N_TROT_KNEE2, KNEE_OFFSET  });
-		delay(140);
-		set_angle_90_multi({ LEG_OFFSET,    LEG_OFFSET,    LEG_OFFSET,    LEG_OFFSET,        KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET  });
-		delay(140);
-		
-		// // 逐步迈出
-        // to_angle_90_sync({ N_TROT_SWING1, LEG_OFFSET,    LEG_OFFSET,    N_TROT_SWING1,     KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET  }, 400);
-		// delay(90);
-        // to_angle_90_sync({ N_TROT_SWING1, LEG_OFFSET,    LEG_OFFSET,    N_TROT_SWING1,     N_TROT_KNEE1, KNEE_OFFSET,  KNEE_OFFSET,  N_TROT_KNEE1 }, 400);
-		// delay(200);
-		// to_angle_90_sync({ N_TROT_SWING1, N_TROT_SWING2, N_TROT_SWING2, N_TROT_SWING1,     N_TROT_KNEE1, KNEE_OFFSET,  KNEE_OFFSET,  N_TROT_KNEE1 }, 600);
-		// delay(140);
-		// to_angle_90_sync({ N_TROT_SWING1, N_TROT_SWING2, N_TROT_SWING2, N_TROT_SWING1,     N_TROT_KNEE1, N_TROT_KNEE2, N_TROT_KNEE2, N_TROT_KNEE1 }, 600);
-		// delay(140);
-		// // 逐步收回
-		// to_angle_90_sync({ LEG_OFFSET,    N_TROT_SWING2, N_TROT_SWING2, LEG_OFFSET,        KNEE_OFFSET,  N_TROT_KNEE2, N_TROT_KNEE2, KNEE_OFFSET  }, 600);
-		// delay(140);
-		// to_angle_90_sync({ LEG_OFFSET,    LEG_OFFSET,    LEG_OFFSET,    LEG_OFFSET,        KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET,  KNEE_OFFSET  }, 600);
-		// delay(140);
+void n_trot_forward() {
+	trotMoveForward(2.0);      // 前进
+	delay(260);
+	while (1) {
+		bleLink.loop();
+		if (current_posture != POSTURE_N_TROT_FORWARD) break;
+		bleLink.clearBuffer();
+		current_posture = POSTURE_NONE;
+		delay(260);
 	}
+	trotRelease();
 }
 
 // // ============== 自定义姿态 ==============
@@ -239,8 +212,8 @@ void proc_posture(void *arg) {
 			stand();
 			current_posture = POSTURE_NONE;
 			break;
-		case POSTURE_N_STAND:
-			n_stand();
+		case POSTURE_HALF_STAND:
+			half_stand();
 			current_posture = POSTURE_NONE;
 			break;
 		case POSTURE_TROT:
@@ -271,9 +244,9 @@ void proc_posture(void *arg) {
 			play();
 			current_posture = POSTURE_STAND;
 			break;
-		case POSTURE_N_TROT:
-			n_trot_forward(1);
-			current_posture = POSTURE_N_STAND;
+		case POSTURE_N_TROT_FORWARD:
+			n_trot_forward();
+			current_posture = POSTURE_STAND;
 			break;
 		case POSTURE_NONE:
 			break;
@@ -290,7 +263,7 @@ void proc_posture(void *arg) {
 void loop() {
 	bleLink.loop();
 	proc_posture(nullptr);
-	vTaskDelay(10 / portTICK_PERIOD_MS);
+	vTaskDelay(20 / portTICK_PERIOD_MS);
 	
     // if (is_trot_forward) {
     // 	is_trot_forward = false;
@@ -381,19 +354,60 @@ void setup() {
     bleLink.onReceive(BLEonReceive);
 
 	Serial.println("======= BLE 信息 =======");
-	Serial.printf("Local BLE MAC: %s\n", bleLink.localAddress().c_str());
-    Serial.printf("Peer  BLE MAC: %s\n", bleLink.peerAddress().c_str());
-    Serial.printf("Role         : %s\n", bleLink.role() == BLETextLink::MASTER ? "MASTER" : "SLAVE");
+	Serial.printf ("Local BLE MAC: %s\n", bleLink.localAddress().c_str());
+    Serial.printf ("Peer  BLE MAC: %s\n", bleLink.peerAddress().c_str());
+    Serial.printf ("Role         : %s\n", bleLink.role() == BLETextLink::MASTER ? "MASTER" : "SLAVE");
 	Serial.println("=======================");
 
     // 按下按键 -> 进入深度睡眠
     pinMode(SLEEP_BTN, INPUT_PULLUP);
-	attachInterrupt(SLEEP_BTN, [] { pixels.setPixelColor(0, 39, 13, 97); pixels.show(); esp_deep_sleep_start(); }, FALLING);
+	attachInterrupt(SLEEP_BTN, [] { pixels.setPixelColor(0, 39, 13, 97); pixels.show(); stand(); esp_deep_sleep_start(); }, FALLING);
     // pinMode(BUTTON_PIN, INPUT_PULLUP);
 	// attachInterrupt(BUTTON_PIN, handle_button_press, FALLING);
 
     // 初始化舵机
     setup_servos(servos_pin, servo_correction);
-	n_stand();
+
+	// ========= 步态初始化 =========
+    // (可选) 注册 电源/释放回调
+    // trotSetPowerCallback(onServoPower);
+    trotSetReleaseCallback(stand);
+
+    // 设置初始参数
+    trotGait(0);          // Trot 步态
+    trotHeight(110);      // 站立高度 110mm (与原工程一致)
+    trotServoInit(0);     // 正常运行模式 (1=回中)
+    trotStable(false);    // 默认关闭自稳
+	// 启动 周期 mainloop 任务 (优先级=4)
+    trotStartTask(4, 4096);
+	trotRelease();
 }
+
+
+// ------------------ IMU 读取函数 (用户实现) ------------------
+// 本示例返回 false (无 IMU), 自稳功能将不生效。
+// 接入真实 IMU 后, 在此填充 IMUData 各字段并 return true。
+bool readIMU(padynamics::IMUData& out) {
+    // TODO: 读取你的 IMU (MPU6050 / ICM20602 / ...)
+    // 示例 (伪代码):
+    //   out.calibrated   = (gyro 校准完成?);
+    //   out.pitch_deg    = ...;
+    //   out.roll_deg     = ...;
+    //   out.pitch_origin = ...;
+    //   out.roll_origin  = ...;
+    //   out.gyro_x_radps = ...;
+    //   out.gyro_y_radps = ...;
+    //   out.acc_z_g      = ...;
+    //   return true;
+    (void)out;
+    return false;
+}
+
+// ------------------ 舵机释放回调 (可选) ------------------
+// void onReleaseServos() {
+//     // 例如: 把所有舵机设为中位 (相对安全的姿态)
+//     m_servo::set_angle_90_multi({ 0, 0, 0, 0, 0, 0, 0, 0 });
+//     // 或: 调用 mixed_servo 库提供的断电接口 (若有)
+// }
+
 
