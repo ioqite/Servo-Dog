@@ -15,28 +15,14 @@ using namespace padynamics;
 #define SLEEP_BTN                   9   // 睡眠按键 引脚
 #define SERVO_DELAY                 7     // 舵机延迟，毫秒
 #define SERVO_RETURN_DELAY          90    // 舵机返回延迟，毫秒
-#define LEG_OFFSET     30 // n: 大腿舵机偏移
-#define KNEE_OFFSET   -50 // n: 小腿舵机偏移
+#define LEG_OFFSET       30   // half_stand: 大腿舵机偏移
+#define KNEE_OFFSET     -50   // half_stand: 小腿舵机偏移
 // 舵机引脚
 uint8_t servos_pin[TOTAL_SERVO_NUM]       = { 4,  5, 11, 10,      14, 12,  0,  3};
 // 舵机校准
 int16_t servo_correction[TOTAL_SERVO_NUM] = { 5, -3,  2,  3,       6, -1,  2, -7};
 
-uint8_t current_posture = 0;
-enum POSTURE {
-	POSTURE_NONE,
-	POSTURE_TROT,
-	POSTURE_WALK,
-	POSTURE_SIT,
-	POSTURE_LIE_DOWN,
-	POSTURE_STRETCH,
-	POSTURE_WAVE,
-	POSTURE_PLAY,
-	POSTURE_N_TROT_FORWARD,
-	POSTURE_HALF_STAND,
-
-	POSTURE_STAND = 12,
-};
+String current_key = "";
 
 // WS2812 pixels(8, 1);
 Adafruit_NeoPixel pixels(1, 8, NEO_GRB + NEO_KHZ800);
@@ -44,14 +30,6 @@ Adafruit_NeoPixel pixels(1, 8, NEO_GRB + NEO_KHZ800);
 // 蓝牙(BLE) 传输器
 BLETextLink bleLink;
 
-// bool running_demo = false;
-// bool is_trot_forward = false;
-// bool is_walk_forward = false;
-// void servo4_demo1();
-// void servo4_demo2();
-void trot_forward(int n);
-void walk_forward(int n);
-void stand();
 bool readIMU(padynamics::IMUData& out);
 
 // BLE 连接 回调
@@ -60,19 +38,6 @@ void BLEonConnect();
 void BLEonDisconnect();
 // BLE 接收 回调
 void BLEonReceive(const String& msg);
-
-// void loop() {
-//     for (int16_t i = -30; i < 30; i++) {
-//         set_angle_90_multi({  i, i, i, i,   i, i, i, i });
-//         vTaskDelay(SERVO_DELAY / portTICK_PERIOD_MS);
-//     }
-//     vTaskDelay(SERVO_RETURN_DELAY / portTICK_PERIOD_MS);
-//     for (int16_t i = 30; i > -30; i--) {
-//         set_angle_90_multi({  i, i, i, i,   i, i, i, i });
-//         vTaskDelay(SERVO_DELAY / portTICK_PERIOD_MS);
-//     }
-//     vTaskDelay(SERVO_RETURN_DELAY / portTICK_PERIOD_MS);
-// }
 
 
 // ================================ 步态代码 ================================
@@ -88,18 +53,25 @@ void stand() {
 // #define TROT_KNEE_UP 25
 #define TROT_PAUSE   270  // 两阶段间短暂停顿(ms), 让身体稳定
 
-void trot_forward(int n) {
-	for (int i = 0; i < n; i++) {
-		// // 阶段1: 组A前摆 + 组B后蹬 (4腿同时动)
-        set_angle_90_multi({ +TROT_SWING, 0, 0, +TROT_SWING,   0, 0, 0, 0});
+void old_trot_forward() {
+	while (1) {
+		// 阶段1: 组A前摆 + 组B后蹬 (4腿同时动)
+		set_angle_90_multi({ +TROT_SWING, 0, 0, +TROT_SWING,   0, 0, 0, 0});
 		//  { +TROT_SWING, 0, 0, +TROT_SWING };
 		delay(TROT_PAUSE);
 
-		// // 阶段2: 组B前摆 + 组A后蹬 (4腿同时动)
-        set_angle_90_multi({ 0, +TROT_SWING, +TROT_SWING, 0,   0, 0, 0, 0});
+		// 阶段2: 组B前摆 + 组A后蹬 (4腿同时动)
+		set_angle_90_multi({ 0, +TROT_SWING, +TROT_SWING, 0,   0, 0, 0, 0});
 		//  { 0, +TROT_SWING, +TROT_SWING, 0 };
 		delay(TROT_PAUSE);
+
+		bleLink.loop();
+		if (current_key != "1") break;
+		bleLink.clearBuffer();
+		current_key = "";
+		// delay(260);
 	}
+	stand();
 }
 
 // ============= Walk 步态 =============
@@ -107,8 +79,8 @@ void trot_forward(int n) {
 // #define WALK_KNEE_UP 22
 #define WALK_PAUSE   230  // 两阶段间短暂停顿(ms), 让身体稳定
 
-void walk_forward(int n) {
-	for (int i = 0; i < n; i++) {
+void old_walk_forward() {
+	while (1) {
 		// 1. 左前(0) 前摆，其余3腿 支撑
         set_angle_90_multi({ +WALK_SWING, 0, 0, 0,   0, 0, 0, 0});
 		//  { +WALK_SWING, 0, 0, 0 };
@@ -128,31 +100,81 @@ void walk_forward(int n) {
         set_angle_90_multi({ 0, 0, +WALK_SWING, 0,   0, 0, 0, 0});
 		//  { 0, 0, +WALK_SWING, 0 };
 		delay(WALK_PAUSE);
+
+		bleLink.loop();
+		if (current_key != "2") break;
+		bleLink.clearBuffer();
+		current_key = "";
+		// delay(260);
 	}
+	stand();
 }
 
 void half_stand() {
 	set_angle_90_multi({ LEG_OFFSET, LEG_OFFSET, LEG_OFFSET, LEG_OFFSET,   KNEE_OFFSET, KNEE_OFFSET, KNEE_OFFSET, KNEE_OFFSET});
 }
 
-void n_trot_forward() {
+namespace padog_gait {
+
+void trot_forward() {
 	trotMoveForward(2.0);      // 前进
 	delay(260);
 	while (1) {
 		bleLink.loop();
-		if (current_posture != POSTURE_N_TROT_FORWARD) break;
+		if (current_key != "w") break;
 		bleLink.clearBuffer();
-		current_posture = POSTURE_NONE;
+		current_key = "";
 		delay(260);
 	}
 	trotRelease();
+}
+
+void trot_backward() {
+	trotMoveBackward(2.0);     // 后退
+	delay(260);
+	while (1) {
+		bleLink.loop();
+		if (current_key != "s") break;
+		bleLink.clearBuffer();
+		current_key = "";
+		delay(260);
+	}
+	trotRelease();
+}
+
+void trot_turn_left() {
+	trotMoveLeft(1.7);         // 原地左转
+	delay(260);
+	while (1) {
+		bleLink.loop();
+		if (current_key != "a") break;
+		bleLink.clearBuffer();
+		current_key = "";
+		delay(260);
+	}
+	trotRelease();
+}
+
+void trot_turn_right() {
+	trotMoveRight(1.7);        // 原地右转
+	delay(260);
+	while (1) {
+		bleLink.loop();
+		if (current_key != "d") break;
+		bleLink.clearBuffer();
+		current_key = "";
+		delay(260);
+	}
+	trotRelease();
+}
+
 }
 
 // // ============== 自定义姿态 ==============
 
 // 坐下
 void sit() {
-    set_angle_90_multi({ -23, -23, 28, 28,   -9, -9, 29, 29 });
+    set_angle_90_multi({ -23, -23, 24, 24,   -9, -9, 31, 31 });
 	// 旧步态：{ -25, -25, 39, 39,   0, 0, 0, 0 }
 }
 
@@ -201,59 +223,30 @@ void play() {
 
 // 处理姿态
 void proc_posture(void *arg) {
-	if (current_posture == POSTURE_NONE) return;
+	if (current_key == "") return;
 
 	uint32_t tmpColor = pixels.getPixelColor(0);
 
 	pixels.setPixelColor(0, 255, 174, 34);// rgb(255, 174, 34)
 	pixels.show();
-	switch (current_posture) {
-		case POSTURE_STAND:
-			stand();
-			current_posture = POSTURE_NONE;
-			break;
-		case POSTURE_HALF_STAND:
-			half_stand();
-			current_posture = POSTURE_NONE;
-			break;
-		case POSTURE_TROT:
-			trot_forward(1);
-			current_posture = POSTURE_STAND;
-			break;
-		case POSTURE_WALK:
-			walk_forward(1);
-			current_posture = POSTURE_STAND;
-			break;
-		case POSTURE_SIT:
-			sit();
-			current_posture = POSTURE_NONE;
-			break;
-		case POSTURE_LIE_DOWN:
-			lie_down();
-			current_posture = POSTURE_NONE;
-			break;
-		case POSTURE_STRETCH:
-			stretch();
-			current_posture = POSTURE_NONE;
-			break;
-		case POSTURE_WAVE:
-			wave();
-			current_posture = POSTURE_SIT;
-			break;
-		case POSTURE_PLAY:
-			play();
-			current_posture = POSTURE_STAND;
-			break;
-		case POSTURE_N_TROT_FORWARD:
-			n_trot_forward();
-			current_posture = POSTURE_STAND;
-			break;
-		case POSTURE_NONE:
-			break;
-		default:
-			current_posture = POSTURE_NONE;
-			break;
-	}
+
+	/* Stand */          if (current_key == "$1") { stand(); }
+	/* Half Stand */else if (current_key == "$2") { half_stand(); }
+	/* Sit */       else if (current_key == "$3") { sit(); }
+	/* Lie Down */  else if (current_key == "$4") { lie_down(); }
+	/* Stretch */   else if (current_key == "$5") { stretch(); }
+	/* Wave */      else if (current_key == "$6") { wave(); }
+	/* Play */      else if (current_key == "$7") { play(); stand(); }
+	/* Padog Trot */else if (current_key == "w" ) { padog_gait::trot_forward(); }
+	/* Padog Trot */else if (current_key == "s" ) { padog_gait::trot_backward(); }
+	/* Padog Trot */else if (current_key == "a" ) { padog_gait::trot_turn_left(); }
+	/* Padog Trot */else if (current_key == "d" ) { padog_gait::trot_turn_right(); }
+
+
+	/* Old Trot */  else if (current_key == "1" ) { old_trot_forward(); }
+	/* Old Walk */  else if (current_key == "2" ) { old_walk_forward(); }
+
+	current_key = "";
 	bleLink.clearBuffer();
 	delay(20);
 	pixels.setPixelColor(0, tmpColor);
@@ -264,31 +257,6 @@ void loop() {
 	bleLink.loop();
 	proc_posture(nullptr);
 	vTaskDelay(20 / portTICK_PERIOD_MS);
-	
-    // if (is_trot_forward) {
-    // 	is_trot_forward = false;
-    // 	trot_forward(1);
-    // } else if (is_walk_forward) {
-    // 	is_walk_forward = false;
-    // 	walk_forward(1);
-    // } else {
-    // 	stand();
-    // }
-
-    // if (running_demo) {
-    // 	servo4_demo1();
-    // 	servo4_demo2();
-    // 		// stand();
-    // 		// delay(500);
-    // 		// trot_forward(100);
-    // 		// walk_forward(10);
-    // 		// delay(500);
-    // 		// stand();
-
-    // } else {
-    // 	stand();
-    // 	while (!running_demo) {}
-    // }
 }
 
 
@@ -322,17 +290,8 @@ void BLEonReceive(const String& msg) {
 	if (msg[msg.length() - 1] != 0x03) return;
 
 	// 解析消息
-	String proc_key = msg.substring(1, msg.length() - 1);
-	// Serial.printf("[Incoming key: %s]\r\n", proc_key.c_str());
-
-	if (proc_key[0] == '$' && proc_key.substring(1).toInt() > 0) {
-		current_posture = proc_key.substring(1).toInt();
-		Serial.printf("Posture: %d\r\n", current_posture);
-		// proc_posture(nullptr);
-	} else {
-		Serial.printf("Unknown command: %s\r\n", proc_key.c_str());
-		return;
-	}
+	current_key = msg.substring(1, msg.length() - 1);
+	// Serial.printf("[Incoming key: %s]\r\n", current_key.c_str());
 }
 
 void setup() {
