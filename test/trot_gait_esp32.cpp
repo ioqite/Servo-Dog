@@ -15,10 +15,6 @@
 
 #include "trot_gait_esp32.h"
 
-#include <Arduino.h>
-#include <cmath>
-#include <algorithm>
-
 namespace padynamics {
 
 /* ============================================================================
@@ -241,9 +237,7 @@ void TrotController::gait(int mode) { state_.gait_mode = mode; }
 void TrotController::servoInit(int key) { state_.init_case = key; }
 void TrotController::setStopRunNode(bool b) { state_.stop_run_node = b; }
 
-void TrotController::release() {
-    if (releaseCb_) releaseCb_();
-}
+void TrotController::release() { if (releaseCb_) releaseCb_(); }
 
 /* ---------- mainloop (对应 padog.mainloop, 仅保留 Trot 分支) ---------- */
 void TrotController::mainloop() {
@@ -376,15 +370,18 @@ void TrotController::mainloop() {
 
     // 调试: 打印 IK 输出和足端坐标 (每 20 个周期打印一次, 避免刷屏)
     {
-        static int dbg_cnt = 0;
-        if (++dbg_cnt >= 20) {
-            dbg_cnt = 0;
-            Serial.printf("[DBG] t=%.3f fx=[%.1f,%.1f,%.1f,%.1f] fy=[%.1f,%.1f,%.1f,%.1f]\n",
-                          state_.t, fx[0], fx[1], fx[2], fx[3], fy[0], fy[1], fy[2], fy[3]);
-            Serial.printf("[DBG] ham=[%.1f,%.1f,%.1f,%.1f] shank=[%.1f,%.1f,%.1f,%.1f]\n",
-                          A.ham1, A.ham2, A.ham3, A.ham4,
-                          A.shank1, A.shank2, A.shank3, A.shank4);
-        }
+    //     static int dbg_cnt = 0;
+    //     if (++dbg_cnt >= 20) {
+    //         dbg_cnt = 0;
+            // Serial.printf("[DBG] t=%.3f spd=%.3f spd_goal=%.3f R_H=%.1f IK_ERR=%d\n",
+            //               trot.getT(), trot.getSpd(), trot.getSpdGoal(),
+            //               trot.getRH(),  trot.getIKError());
+            // Serial.printf("[DBG] fx=[%.1f,%.1f,%.1f,%.1f] fy=[%.1f,%.1f,%.1f,%.1f]\n",
+            //               fx[0], fx[1], fx[2], fx[3], fy[0], fy[1], fy[2], fy[3]);
+            // Serial.printf("[DBG] ham=[%.1f,%.1f,%.1f,%.1f] shank=[%.1f,%.1f,%.1f,%.1f]\n",
+            //               A.ham1, A.ham2, A.ham3, A.ham4,
+            //               A.shank1, A.shank2, A.shank3, A.shank4);
+        // }
     }
 
     // 14. 输出到舵机
@@ -544,14 +541,9 @@ void TrotController::servo_output(double ham1, double ham2, double ham3, double 
         }
     }
 
-    // 调用用户舵机库批量下发: {hip1, hip2, hip3, hip4, knee1, knee2, knee3, knee4}
+    // 调用用户舵机库批量下发
     m_servo::set_angle_90_multi({ off[0], off[1], off[3], off[2],
                                   off[4], off[5], off[7], off[6] });
-
-    // // 直接下发 0~180° 绝对角度到各舵机通道
-    // for (int i = 0; i < 8; i++) {
-    //     m_servo::set_angle(i, off[i]);
-    // }
 }
 
 /* ============================================================================
@@ -577,7 +569,7 @@ void trotStartTask(uint8_t priority, uint32_t stackSize) {
     s_trot_task_run = true;
     xTaskCreate(
         trot_task,
-        "trot",
+        "trot_task",
         stackSize,
         nullptr,
         priority,
@@ -599,3 +591,4 @@ bool __attribute__((weak)) readIMU(padynamics::IMUData& out) {
     (void)out;
     return false;   // 默认无 IMU, 自稳不生效
 }
+

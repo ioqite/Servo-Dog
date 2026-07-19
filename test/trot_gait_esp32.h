@@ -31,6 +31,9 @@
 
 #include <cstdint>
 #include <cmath>
+#include <Arduino.h>
+#include <cmath>
+#include <algorithm>
 
 /* 用户舵机库 */
 #include "mixed_servo.hpp"
@@ -214,6 +217,11 @@ extern TrotController trot;
 /* ============================================================================
  * 5. C 风格顶层 API (Arduino 友好, 直接调用无需加 trot. 前缀)
  * ========================================================================== */
+/* 启动 FreeRTOS 任务自动调用 mainloop (5ms 周期, 默认 core=0, 优先级=4) */
+void trotStartTask(uint8_t priority, uint32_t stackSize);
+/* 停止 mainloop 任务 */
+void trotStopTask();
+
 inline void trotMainloop()                 { trot.mainloop(); }
 inline void trotMove(double s, double L, double R) { trot.move(s, L, R); }
 inline void trotHeight(double goal)        { trot.height(goal); }
@@ -222,15 +230,34 @@ inline void trotStable(bool on)            { trot.stable(on); }
 inline void trotGait(int mode)             { trot.gait(mode); }
 inline void trotServoInit(int key)         { trot.servoInit(key); }
 inline void trotSetStopRunNode(bool b)     { trot.setStopRunNode(b); }
-inline void trotRelease()                  { trot.release(); }
+inline void trotRelease()                  { trotStopTask(); trot.release(); }
 inline void trotSetPowerCallback(TrotController::PowerCallback cb)   { trot.setPowerCallback(cb); }
 inline void trotSetReleaseCallback(TrotController::ReleaseCallback cb) { trot.setReleaseCallback(cb); }
 
-/* 启动 FreeRTOS 任务自动调用 mainloop (5ms 周期, 默认 core=0, 优先级=4) */
-void trotStartTask(uint8_t priority, uint32_t stackSize);
-
-/* 停止 mainloop 任务 */
-void trotStopTask();
+// 快捷移动函数
+inline void trotMoveForward(double speed) {
+    trotServoInit(0);
+    trotStartTask(4, 4096);  /* 确保任务在运行 (q 后重启) */
+    trotMove(speed, 1, 1);     /* 前进 */
+}
+inline void trotMoveBackward(double speed) {
+    trotServoInit(0);
+    trotStartTask(4, 4096);  /* 确保任务在运行 (q 后重启) */
+    trotMove(speed, -1, -1);     /* 后退 */
+}
+inline void trotMoveLeft(double speed) {
+    trotServoInit(0);
+    trotStartTask(4, 4096);  /* 确保任务在运行 (q 后重启) */
+    trotMove(speed, -1, 1);     /* 左转 */
+}
+inline void trotMoveRight(double speed) {
+    trotServoInit(0);
+    trotStartTask(4, 4096);  /* 确保任务在运行 (q 后重启) */
+    trotMove(speed, 1, -1);     /* 右转 */
+}
+inline void trotMoveStop() {
+    trotMove(0, 0, 0);     /* 停止 */
+}
 
 } // namespace padynamics
 

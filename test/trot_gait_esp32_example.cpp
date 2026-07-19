@@ -86,7 +86,7 @@ void setup() {
 
     // ---- Trot 步态初始化 ----
     // (可选) 注入电源/释放回调
-    trotSetPowerCallback(onServoPower);
+    // trotSetPowerCallback(onServoPower);
     trotSetReleaseCallback(onReleaseServos);
 
     // 设置初始参数
@@ -102,7 +102,7 @@ void setup() {
     // 启动 5ms 周期 mainloop 任务 (core=0, 优先级=4)
     trotStartTask(4, 4096);
 
-    Serial.println("Trot gait started. Commands: f/b/l/r/s/q");
+    Serial.println("Trot gait started. Commands:");
     Serial.println("  f = forward, b = backward, l = turn left, r = turn right");
     Serial.println("  s = stop,    q = release servos");
 }
@@ -114,41 +114,23 @@ void loop() {
         cmd.trim();
         cmd.toLowerCase();
         if (cmd == "f") {
-            trotServoInit(0);
-            trotStartTask(4, 4096);         // 确保任务在运行 (q 后重启)
-            trotMove(2.0, 1, 1);          // 前进
+            trotMoveForward(2.0);      // 前进
             Serial.println("-> forward");
         } else if (cmd == "b") {
-            trotServoInit(0);
-            trotStartTask(4, 4096);
-            trotMove(2.0, -1, -1);        // 后退
+            trotMoveBackward(2.0);     // 后退
             Serial.println("-> backward");
         } else if (cmd == "l") {
-            trotServoInit(0);
-            trotStartTask(4, 4096);
-            trotMove(2.5, -1, 1);         // 原地左转
+            trotMoveLeft(1.7);         // 原地左转
             Serial.println("-> turn left");
         } else if (cmd == "r") {
-            trotServoInit(0);
-            trotStartTask(4, 4096);
-            trotMove(2.5, 1, -1);         // 原地右转
+            trotMoveRight(1.7);        // 原地右转
             Serial.println("-> turn right");
         } else if (cmd == "s") {
-            trotMove(0, 0, 0);            // 停止
+            trotMoveStop();            // 停止
             Serial.println("-> stop");
         } else if (cmd == "q") {
-            trotStopTask();
             trotRelease();
             Serial.println("-> released");
-        } else if (cmd == "h") {
-            trotHeight(110);
-            Serial.println("-> height=110");
-        } else if (cmd == "low") {
-            trotHeight(90);
-            Serial.println("-> height=90");
-        } else if (cmd == "hi") {
-            trotHeight(130);
-            Serial.println("-> height=130");
         } else if (cmd == "stab_on") {
             trotStable(true);
             Serial.println("-> trot Stable ON");
@@ -156,9 +138,9 @@ void loop() {
             trotStable(false);
             Serial.println("-> trot Stable OFF");
         } else if (cmd == "info") {
-            Serial.printf("t=%.3f spd=%.3f spd_goal=%.3f R_H=%.1f IK_ERR=%d\n",
-                          trot.getT(), trot.getSpd(), trot.getSpdGoal(),
-                          trot.getRH(),  trot.getIKError());
+            Serial.printf("[DBG] t=%.3f speed=%.3f speed_goal=%.3f R_H=%.1f IK_ERR=%d\r\n",
+                trot.getT(), trot.getSpd(), trot.getSpdGoal(),
+                trot.getRH(),  trot.getIKError());
         }
     }
     vTaskDelay(20 / portTICK_PERIOD_MS);
