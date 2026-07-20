@@ -282,7 +282,7 @@ void TrotController::mainloop() {
     //    注意 r1,r2 用 L; r3,r4 用 R (即腿1,2 与 3,4 方向独立)
     //    增大足端位移系数使动作更明显 (原工程 spd 是 0~1 范围)
     GaitResult P = trot_gait(state_.t, state_.spd_goal * 25, cfg.h,
-                             state_.L, state_.R, state_.L, state_.R);
+                             state_.L, state_.L, state_.R, state_.R);
 
     // 6. 高度调节器 (P)
     if (state_.R_H > state_.H_goal) {

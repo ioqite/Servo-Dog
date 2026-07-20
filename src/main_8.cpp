@@ -15,8 +15,8 @@ using namespace padynamics;
 #define SLEEP_BTN                   9   // 睡眠按键 引脚
 #define SERVO_DELAY                 7     // 舵机延迟，毫秒
 #define SERVO_RETURN_DELAY          90    // 舵机返回延迟，毫秒
-#define LEG_OFFSET       30   // half_stand: 大腿舵机偏移
-#define KNEE_OFFSET     -50   // half_stand: 小腿舵机偏移
+#define LEG_OFFSET      -30   // half_stand: 大腿舵机偏移
+#define KNEE_OFFSET      50   // half_stand: 小腿舵机偏移
 // 舵机引脚
 uint8_t servos_pin[TOTAL_SERVO_NUM]       = { 4,  5, 11, 10,      14, 12,  0,  3};
 // 舵机校准
@@ -174,7 +174,7 @@ void trot_turn_right() {
 
 // 坐下
 void sit() {
-    set_angle_90_multi({ -23, -23, 24, 24,   -9, -9, 31, 31 });
+    set_angle_90_multi({ -23, -23, 24, 24,   -9, -9, 2, 2 });
 	// 旧步态：{ -25, -25, 39, 39,   0, 0, 0, 0 }
 }
 
@@ -203,8 +203,7 @@ void wave() {
 		delay(200);
 	}
 	// 回到坐姿
-	set_angle_90(1, -25);
-	set_angle_90(5, 0);
+	sit();
 }
 
 // 玩耍
