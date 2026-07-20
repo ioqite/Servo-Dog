@@ -15,6 +15,9 @@
 
 #include "padog_gait.h"
 
+int16_t LEG_OFFSET  = -30;   // half_stand: 大腿舵机偏移
+int16_t KNEE_OFFSET =  50;   // half_stand: 小腿舵机偏移
+
 namespace padynamics {
 
 /* ============================================================================
@@ -542,8 +545,8 @@ void TrotController::servo_output(double ham1, double ham2, double ham3, double 
     }
 
     // 调用用户舵机库批量下发
-    m_servo::set_angle_90_multi({ off[0], off[1], off[3], off[2],
-                                  off[4], off[5], off[7], off[6] });
+    m_servo::set_angle_90_multi({ (short)(off[0] + LEG_OFFSET), (short)(off[1] + LEG_OFFSET), (short)(off[3] + LEG_OFFSET), (short)(off[2] + LEG_OFFSET),
+                                  (short)(off[4] + KNEE_OFFSET), (short)(off[5] + KNEE_OFFSET), (short)(off[7] + KNEE_OFFSET), (short)(off[6] + KNEE_OFFSET) });
 }
 
 /* ============================================================================
